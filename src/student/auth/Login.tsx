@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Logo from "../../assets/cu_logo.jpg";
+import toast from "react-hot-toast";
 
 const Login = () => {
   const [regNumber, setRegNumber] = useState("");
@@ -13,9 +14,14 @@ const Login = () => {
     e.preventDefault();
     axios
       .post("http://localhost:3001/login", { regNumber, password })
-      .then((response) => {console.log(response);
-        if(response.data === "success") {
-            navigate('/studentdashboard')
+      .then((res) => {
+        if (res.data === "success") {
+          toast.success("Login successful");
+          navigate("/studentdashboard");
+        } else if (res.data === "the password is incorrect") {
+          toast.error("Incorrect password");
+        } else if (res.data === "No record existed") {
+          toast.error("No account found");
         }
       })
       .catch((err) => console.log(err));
@@ -23,6 +29,7 @@ const Login = () => {
   };
 
   return (
+    
     <div className="min-h-screen flex justify-center items-center bg-gray-50 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-md p-8">
         <div className="flex justify-center mb-6">

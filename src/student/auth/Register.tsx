@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import Logo from "../../assets/cu_logo.jpg";
 import { useNavigate } from "react-router";
+import toast from "react-hot-toast";
 
 const Register = () => {
   const [name, setName] = useState("");
@@ -11,7 +12,6 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("")
 
-
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate()
 
@@ -20,9 +20,15 @@ const Register = () => {
     e.preventDefault()
     axios.post('http://localhost:3001/register', { name, regNumber, email, dormitory, password, confirmPassword })
       .then((response) => {console.log(response);
+         toast.success("✅ Registered successfully!");
          navigate('/login')})
-      .catch(err => console.log(err))
-    setIsLoading(true)
+         .catch((err) => {
+            console.log(err);
+            toast.error("❌ Registration failed. Please try again.");
+          })
+          .finally(() => {
+            setIsLoading(true);
+          });
 
   }
 
