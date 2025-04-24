@@ -15,7 +15,7 @@ const UserSelection = () => {
                 <p className="mt-2 text-gray-600">Please select your user type to continue</p>
 
                 <div className="grid gap-4 mt-8 ">
-                    <button className={`cursor-pointer transition-all hover:shadow-md text-start`} onClick={() => navigate("/student")}>
+                    <button className={`cursor-pointer transition-all hover:shadow-md text-start`} onClick={() => navigate("/login")}>
                         <div className="flex flex-row items-center gap-4 border border-gray-500 p-3 rounded-sm">
                         <School className="h-8 w-8 text-primary" />
                         <div>
