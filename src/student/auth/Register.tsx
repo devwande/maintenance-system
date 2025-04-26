@@ -36,25 +36,36 @@ const Register = () => {
 
   const registerMutation = useMutation({
     mutationFn: (userData: Omit<FormValues, "confirmPassword">) => {
-      return axios.post("http://localhost:3001/register", userData)
-    },
-    onSuccess: () => {
-      toast.success("Registered successfully!")
-      navigate("/login")
+      return axios.post("http://localhost:3001/register", userData, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
     },
     onError: (error: any) => {
-      console.error(error)
-
-      if (
-        error.response?.data?.message?.includes("reg number") ||
-        error.response?.data?.error?.includes("reg number") ||
-        error.response?.status === 409
-      ) {
-        toast.error("An account with this registration number already exists.")
+      console.log("Full error object:", error);
+      console.log("Error response:", error.response);
+      
+      if (error.response) {
+        if (error.response.status === 409) {
+          const errorField = error.response.data.message.includes("email") ? "email" : "registration number";
+          toast.error(`An account with this ${errorField} already exists.`);
+        } else if (error.response.data?.message) {
+          toast.error(error.response.data.message);
+        } else {
+          toast.error(`Registration failed (${error.response.status})`);
+        }
+      } else if (error.request) {
+        toast.error("No response from server. Is the backend running?");
       } else {
-        toast.error("Registration failed. Please try again.")
+        toast.error("Network error. Please check your connection.");
       }
     },
+    
+    onSuccess: () => {
+        toast.success("Registered successfully!")
+        navigate("/login")
+      },
   })
 
   const onSubmit = (data: FormValues) => {

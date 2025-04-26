@@ -1,2 +1,45 @@
 @import "tailwindcss";
 @import "@radix-ui/themes/styles.css";
+@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&display=swap');
+@layer theme, base, components, utilities;
+
+
+
+@layer components {
+    .container-box {
+        @apply px-[clamp(24px,calc(24px+96*((100vw-375px)/1065)),120px)] w-full max-w-[1440px] mx-auto
+    }
+
+    .container-body {
+        @apply p-6
+    }
+
+    .container-in {
+        @apply mx-6;
+    }
+
+    .button {
+        @apply border flex font-bold border-black bg-black text-white px-16 py-5 gap-x-3 hover:bg-medium-gray hover:border-medium-gray
+    }
+}
+
+    @theme {
+        --breakpoint-sm: 570px;
+        --breakpoint-md: 768px;
+        --breakpoint-ls: 900px;
+        --breakpoint-lg: 1024px;
+        --breakpoint-ld: 1140px;
+        --breakpoint-xl: 1280px;
+
+        --font-primary: "League Spartan", "sans-serif";
+        --color-dark-blue: rgb(27, 29, 35);
+        --color-dark-gray: rgb(96, 99, 109);
+        --color-medium-gray: rgb(125, 130, 143);
+        --color-light-gray: rgb(200, 204, 216);
+        --color-very-light-gray: rgb(238, 239, 244);
+        --color-red: rgb(223, 86, 86);
+
+    }
+
+
+

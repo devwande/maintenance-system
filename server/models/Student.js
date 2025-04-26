@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const StudentSchema = new mongoose.Schema({
     name: { 
@@ -26,6 +27,21 @@ const StudentSchema = new mongoose.Schema({
         minlength: [8, 'Password must be at least 8 characters long']
     }
 });
+
+// Hash password before saving
+StudentSchema.pre('save', async function(next) {
+    if (!this.isModified('password')) return next();
+    this.password = await bcrypt.hash(this.password, 12);
+    next();
+});
+
+// Method to compare passwords
+StudentSchema.methods.correctPassword = async function(
+    candidatePassword,
+    userPassword
+) {
+    return await bcrypt.compare(candidatePassword, userPassword);
+};
 
 const StudentModel = mongoose.model("studentregister", StudentSchema);
 

@@ -22,14 +22,23 @@ const Login = () => {
       regNumber: formData.get("regNumber") as string,
       password: formData.get("password") as string,
     };
-
+  
     try {
       const response = await axios.post("http://localhost:3001/login", values);
       
-      if (response.data.message === "Login successful") {
+      // Handle both possible response structures
+      if (response.data.status === "success" || response.data.message === "Login successful") {
+        const userData = response.data.user || response.data.data?.user;
         toast.success("Login successful");
-        localStorage.setItem("user", JSON.stringify(response.data.user));
-        navigate("/studentdashboard");
+        localStorage.setItem("user", JSON.stringify(userData));
+
+        
+        // Double-ensure navigation
+        navigate("/studentdashboard", { replace: true });
+        window.location.reload(); // Optional: if layout needs refresh
+      } else {
+        toast.error("Unexpected response format");
+        console.error("Unexpected response:", response.data);
       }
     } catch (error: any) {
       console.error("Login error:", error);
