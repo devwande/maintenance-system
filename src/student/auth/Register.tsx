@@ -1,22 +1,27 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { useMutation } from "@tanstack/react-query"
-import { useForm } from "react-hook-form"
-import axios from "axios"
-import { toast } from "react-hot-toast"
-import Logo from "../../assets/cu_logo.jpg"
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import axios from "axios";
+import { toast } from "react-hot-toast";
+import Logo from "../../assets/cu_logo.jpg";
 
 type FormValues = {
-  name: string
-  regNumber: string
-  email: string
-  dormitory: string
-  password: string
-  confirmPassword: string
-}
+  name: string;
+  regNumber: string;
+  email: string;
+  dormitory: string;
+  password: string;
+  confirmPassword: string;
+};
 
 const Register = () => {
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting }, } = useForm<FormValues>({
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({
     mode: "onChange",
     defaultValues: {
       name: "",
@@ -26,29 +31,35 @@ const Register = () => {
       password: "",
       confirmPassword: "",
     },
-  })
+  });
 
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const navigate = useNavigate()
-  const password = watch("password")
+  const navigate = useNavigate();
+  const password = watch("password");
 
   const registerMutation = useMutation({
     mutationFn: (userData: Omit<FormValues, "confirmPassword">) => {
-      return axios.post("http://localhost:3001/register", userData, {
-        headers: {
-          'Content-Type': 'application/json'
+      return axios.post(
+        `http://localhost:3001/register`,
+        userData,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
-      });
+      );
     },
     onError: (error: any) => {
       console.log("Full error object:", error);
       console.log("Error response:", error.response);
-      
+
       if (error.response) {
         if (error.response.status === 409) {
-          const errorField = error.response.data.message.includes("email") ? "email" : "registration number";
+          const errorField = error.response.data.message.includes("email")
+            ? "email"
+            : "registration number";
           toast.error(`An account with this ${errorField} already exists.`);
         } else if (error.response.data?.message) {
           toast.error(error.response.data.message);
@@ -61,33 +72,39 @@ const Register = () => {
         toast.error("Network error. Please check your connection.");
       }
     },
-    
+
     onSuccess: () => {
-        toast.success("Registered successfully!")
-        navigate("/login")
-      },
-  })
+      toast.success("Registered successfully!");
+      navigate("/login");
+    },
+  });
 
   const onSubmit = (data: FormValues) => {
-    const { confirmPassword, ...registrationData } = data
-    registerMutation.mutate(registrationData)
-  }
+    const { confirmPassword, ...registrationData } = data;
+    registerMutation.mutate(registrationData);
+  };
 
   const togglePasswordVisibility = (field: "password" | "confirmPassword") => {
     if (field === "password") {
-      setShowPassword(!showPassword)
+      setShowPassword(!showPassword);
     } else {
-      setShowConfirmPassword(!showConfirmPassword)
+      setShowConfirmPassword(!showConfirmPassword);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-gray-50 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-md p-8">
         <div className="flex justify-center mb-6">
-          <img src={Logo || "/placeholder.svg"} alt="Logo" className="max-w-[100px]" />
+          <img
+            src={Logo || "/placeholder.svg"}
+            alt="Logo"
+            className="max-w-[100px]"
+          />
         </div>
-        <h2 className="text-2xl font-bold mb-6 text-center">Student Register</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">
+          Student Register
+        </h2>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1">
@@ -100,7 +117,9 @@ const Register = () => {
               {...register("name", { required: "Full name is required" })}
               className="border border-gray-300 w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
             />
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
+            {errors.name && (
+              <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -110,10 +129,16 @@ const Register = () => {
             <input
               id="regNumber"
               placeholder="e.g. 2100599"
-              {...register("regNumber", { required: "Registration number is required" })}
+              {...register("regNumber", {
+                required: "Registration number is required",
+              })}
               className="border border-gray-300 w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
             />
-            {errors.regNumber && <p className="text-red-500 text-xs mt-1">{errors.regNumber.message}</p>}
+            {errors.regNumber && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.regNumber.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -133,7 +158,11 @@ const Register = () => {
               })}
               className="border border-gray-300 w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
             />
-            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+            {errors.email && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.email.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -143,10 +172,16 @@ const Register = () => {
             <input
               id="dormitory"
               placeholder="Building & Room Number"
-              {...register("dormitory", { required: "Hall and room number is required" })}
+              {...register("dormitory", {
+                required: "Hall and room number is required",
+              })}
               className="border border-gray-300 w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
             />
-            {errors.dormitory && <p className="text-red-500 text-xs mt-1">{errors.dormitory.message}</p>}
+            {errors.dormitory && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.dormitory.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -207,7 +242,11 @@ const Register = () => {
                 )}
               </button>
             </div>
-            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+            {errors.password && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.password.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -220,7 +259,8 @@ const Register = () => {
                 type={showConfirmPassword ? "text" : "password"}
                 {...register("confirmPassword", {
                   required: "Please confirm your password",
-                  validate: (value) => value === password || "Passwords do not match",
+                  validate: (value) =>
+                    value === password || "Passwords do not match",
                 })}
                 className="border border-gray-300 w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-black pr-10"
               />
@@ -228,7 +268,9 @@ const Register = () => {
                 type="button"
                 onClick={() => togglePasswordVisibility("confirmPassword")}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                aria-label={
+                  showConfirmPassword ? "Hide password" : "Show password"
+                }
               >
                 {showConfirmPassword ? (
                   <svg
@@ -265,25 +307,31 @@ const Register = () => {
                 )}
               </button>
             </div>
-            {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword.message}</p>}
+            {errors.confirmPassword && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.confirmPassword.message}
+              </p>
+            )}
           </div>
 
           <p>
-            Already have an account? <a href="/login" className="underline hover:text-purple-500">Sign in</a>
+            Already have an account?{" "}
+            <a href="/login" className="underline hover:text-purple-500">
+              Sign in
+            </a>
           </p>
 
           <button
             type="submit"
             disabled={isSubmitting}
             className="w-full bg-black text-white py-2 px-4 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-            >
+          >
             {isSubmitting ? "Registering..." : "Register"}
           </button>
-
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Register
+export default Register;

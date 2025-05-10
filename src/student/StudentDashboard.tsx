@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PlusIcon, X } from 'lucide-react';
 import Header from "./components/header";
+import axios from "axios";
 
 interface FormData {
   title: string;
@@ -8,6 +9,16 @@ interface FormData {
   location: string;
   description: string;
   image: File | null;
+}
+
+interface MaintenanceRequest {
+  _id: string;
+  title: string;
+  category: string;
+  location: string;
+  description: string;
+  status: string;
+  createdAt: string;
 }
 
 const StudentDashboard = () => {
@@ -20,6 +31,51 @@ const StudentDashboard = () => {
     image: null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
+  const [studentRegNumber, setStudentRegNumber] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get student data from localStorage
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+        setStudentRegNumber(parsedData.regNumber);
+        fetchRequests(parsedData.regNumber);
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        setError("Could not load user data. Please log in again.");
+      }
+    } else {
+      setError("User not logged in. Please log in to view your requests.");
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchRequests = async (regNumber: string) => {
+    setIsLoading(true);
+    setError(null);
+  
+    try {
+      const response = await axios.get(`http://localhost:3001/api/requests/${regNumber}`);
+      const data = response.data;
+  
+      // Make sure data is an array
+      if (Array.isArray(data)) {
+        setRequests(data);
+      } else {
+        setRequests([]);
+      }
+  
+    } catch (error) {
+      console.error("Error fetching requests:", error);
+      setError("Failed to load maintenance requests. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -51,18 +107,48 @@ const StudentDashboard = () => {
     setIsSubmitting(true);
     
     try {
-      // Here you would normally send the data to your API
-      console.log("Form submitted:", formData);
+      // Create FormData object for file upload
+      const formDataToSend = new FormData();
+      formDataToSend.append('title', formData.title);
+      formDataToSend.append('category', formData.category);
+      formDataToSend.append('location', formData.location);
+      formDataToSend.append('description', formData.description);
+      formDataToSend.append('studentRegNumber', studentRegNumber);
       
-      // Simulate API call with a timeout
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (formData.image) {
+        formDataToSend.append('image', formData.image);
+      }
+  
+      // For debugging - log the form data before sending
+      console.log("Form submitted:", {
+        title: formData.title,
+        category: formData.category,
+        location: formData.location,
+        description: formData.description,
+        hasImage: !!formData.image
+      });
+  
+      // Submit to backend
+      await axios.post(`http://localhost:3001/api/requests`, formDataToSend, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+  
+      // Small delay for better UX (optional)
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Close modal and reset form after successful submission
+      // Close modal and reset
       setIsModalOpen(false);
       resetForm();
+      
+      // Refresh requests list
+      fetchRequests(studentRegNumber);
+      
     } catch (error) {
       console.error("Error submitting form:", error);
-      // Handle submission error (you could show an error message)
+      // Optionally show error to user
+      setError("Failed to submit request. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -97,7 +183,7 @@ const StudentDashboard = () => {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0  bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-2xl">
             <div className="flex justify-between items-center border-b p-4">
               <h2 className="text-xl font-bold">
@@ -227,6 +313,46 @@ const StudentDashboard = () => {
           </div>
         </div>
       )}
+
+        <section className="px-4 md:px-24 mt-8">
+          {isLoading ? (
+            <div className="text-center py-8">
+              <p>Loading your maintenance requests...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8 text-red-500">
+              <p>{error}</p>
+            </div>
+          ) : requests.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>You haven't submitted any maintenance requests yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {requests.map((request) => (
+                <div key={request._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-bold">{request.title}</h3>
+                      <p className="text-sm text-gray-600">{request.category} • {request.location}</p>
+                    </div>
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      request.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                      request.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {request.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm">{request.description}</p>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Submitted on {new Date(request.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
     </>
   );
 };

@@ -24,7 +24,7 @@ const Login = () => {
     };
   
     try {
-      const response = await axios.post("http://localhost:3001/login", values);
+      const response = await axios.post(`http://localhost:3001/login`, values);
       
       // Handle both possible response structures
       if (response.data.status === "success" || response.data.message === "Login successful") {
