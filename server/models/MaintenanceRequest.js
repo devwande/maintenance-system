@@ -6,9 +6,17 @@ const MaintenanceRequestSchema = new mongoose.Schema({
   location: { type: String, required: true },
   description: { type: String, required: true },
   imageUrl: { type: String }, // Will store the path to uploaded image
-  status: { type: String, default: 'Pending' }, // Pending, In Progress, Completed
+  status: { type: String, default: 'Pending', enum: ['Pending', 'In Progress', 'Completed'] },
   studentRegNumber: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now }
+  workerFeedback: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+// Update the updatedAt field on save
+MaintenanceRequestSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
 });
 
 export default mongoose.model('MaintenanceRequest', MaintenanceRequestSchema);
