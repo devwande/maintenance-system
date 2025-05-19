@@ -232,10 +232,10 @@ const StudentDashboard = () => {
                   required
                 >
                   <option value="">Select a category</option>
-                  <option value="Electrical">Electrical</option>
+                  <option value="Electrician">Electrical</option>
+                  <option value="Carpenter">Carpenter</option>
                   <option value="Plumbing">Plumbing</option>
                   <option value="HVAC">HVAC</option>
-                  <option value="Furniture">Furniture</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
