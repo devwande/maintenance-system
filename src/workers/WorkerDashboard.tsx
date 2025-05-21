@@ -1,62 +1,66 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { toast } from "react-hot-toast";
-import Header from "@/components/Header";
+"use client"
+
+import type React from "react"
+
+import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
+import axios from "axios"
+import { toast } from "react-hot-toast"
+import Header from "@/components/Header"
 
 interface MaintenanceRequest {
-  _id: string;
-  title: string;
-  category: string;
-  location: string;
-  description: string;
-  status: string;
-  createdAt: string;
-  studentRegNumber: string;
-  imageUrl?: string;
-  workerFeedback?: string;
+  _id: string
+  title: string
+  category: string
+  location: string
+  description: string
+  status: string
+  createdAt: string
+  studentRegNumber: string
+  imageUrl?: string
+  workerFeedback?: string
 }
 
 const WorkerDashboard = () => {
-  const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [workerRole, setWorkerRole] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
-  const [feedback, setFeedback] = useState<string>("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  
-  const navigate = useNavigate();
+  const [requests, setRequests] = useState<MaintenanceRequest[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [workerRole, setWorkerRole] = useState<string>("")
+  const [statusFilter, setStatusFilter] = useState<string>("")
+  const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null)
+  const [feedback, setFeedback] = useState<string>("")
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  const navigate = useNavigate()
 
   useEffect(() => {
-    const userData = localStorage.getItem("user");
+    const userData = localStorage.getItem("user")
     if (userData) {
       try {
-        const parsedData = JSON.parse(userData);
+        const parsedData = JSON.parse(userData)
         if (parsedData.userType !== "worker") {
-          toast.error("Unauthorized access");
-          navigate("/");
-          return;
+          toast.error("Unauthorized access")
+          navigate("/")
+          return
         }
-        setWorkerRole(parsedData.role);
-        fetchRequests(parsedData.role);
+        setWorkerRole(parsedData.role)
+        fetchRequests(parsedData.role)
       } catch (error) {
-        console.error("Error parsing user data:", error);
-        setError("Could not load user data. Please log in again.");
-        navigate("/worker");
+        console.error("Error parsing user data:", error)
+        setError("Could not load user data. Please log in again.")
+        navigate("/worker")
       }
     } else {
-      setError("User not logged in");
-      navigate("/worker");
+      setError("User not logged in")
+      navigate("/worker")
     }
-  }, [navigate]);
+  }, [navigate])
 
   // const fetchRequests = async (role: string, status: string = "") => {
   //   setIsLoading(true);
   //   setError(null);
-  
+
   //   try {
   //     const url = `http://localhost:3001/api/worker/requests/${role}${status ? `?status=${status}` : ''}`;
   //     const response = await axios.get(url);
@@ -69,76 +73,87 @@ const WorkerDashboard = () => {
   //   }
   // };
 
-  const fetchRequests = async (role: string, status: string = "") => {
-  setIsLoading(true);
-  setError(null);
+  const fetchRequests = async (role: string, status = "") => {
+    setIsLoading(true)
+    setError(null)
 
-  try {
-    const normalizedRole = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-    console.log(`Fetching requests for role: ${normalizedRole}`);
-    const url = `http://localhost:3001/api/worker/requests/${normalizedRole}${status ? `?status=${status}` : ''}`;
-    console.log(`Request URL: ${url}`);
-    const response = await axios.get(url);
-    console.log('Response data:', response.data);
-    setRequests(response.data);
-  } catch (error) {
-    console.error("Error fetching requests:", error);
-    setError("Failed to load maintenance requests. Please try again later.");
-  } finally {
-    setIsLoading(false);
+    try {
+      // Map worker roles to request categories
+      const roleToCategory = {
+        Electrician: "Electrical",
+        Plumber: "Plumbing",
+        Carpenter: "Carpenter",
+        Other: "Other",
+      }
+
+      // Use the mapped category or the original role if no mapping exists
+      const category = roleToCategory[role] || role
+
+      console.log(`Fetching requests for category: ${category}`)
+      const url = `http://localhost:3001/api/worker/requests/${role}${status ? `?status=${status}` : ""}`
+
+      const response = await axios.get(url)
+      setRequests(response.data)
+    } catch (error) {
+      console.error("Error fetching requests:", error)
+      setError("Failed to load maintenance requests. Please try again later.")
+    } finally {
+      setIsLoading(false)
+    }
   }
-};
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const status = e.target.value;
-    setStatusFilter(status);
-    fetchRequests(workerRole, status);
-  };
+    const status = e.target.value
+    setStatusFilter(status)
+    fetchRequests(workerRole, status)
+  }
 
   const handleUpdateStatus = async (newStatus: string) => {
-    if (!selectedRequest) return;
-    
-    setIsUpdating(true);
-    
+    if (!selectedRequest) return
+
+    setIsUpdating(true)
+
     try {
       const response = await axios.patch(`http://localhost:3001/api/requests/${selectedRequest._id}`, {
         status: newStatus,
-        workerFeedback: feedback
-      });
-      
+        workerFeedback: feedback,
+      })
+
       if (response.status === 200) {
-        toast.success(`Request marked as ${newStatus}`);
-        setIsModalOpen(false);
-        setFeedback("");
-        fetchRequests(workerRole, statusFilter);
+        toast.success(`Request marked as ${newStatus}`)
+        setIsModalOpen(false)
+        setFeedback("")
+        fetchRequests(workerRole, statusFilter)
       }
     } catch (error) {
-      console.error("Error updating request:", error);
-      toast.error("Failed to update request status");
+      console.error("Error updating request:", error)
+      toast.error("Failed to update request status")
     } finally {
-      setIsUpdating(false);
+      setIsUpdating(false)
     }
-  };
+  }
 
   const openRequestModal = (request: MaintenanceRequest) => {
-    setSelectedRequest(request);
-    setFeedback(request.workerFeedback || "");
-    setIsModalOpen(true);
-  };
+    setSelectedRequest(request)
+    setFeedback(request.workerFeedback || "")
+    setIsModalOpen(true)
+  }
 
   return (
     <>
       <Header />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold">Maintenance Worker Dashboard</h1>
           <p className="text-gray-600">Manage maintenance requests assigned to you</p>
         </div>
-        
+
         <div className="mb-6 flex justify-between items-center">
           <div>
-            <label htmlFor="statusFilter" className="mr-2 font-medium">Filter by status:</label>
+            <label htmlFor="statusFilter" className="mr-2 font-medium">
+              Filter by status:
+            </label>
             <select
               id="statusFilter"
               value={statusFilter}
@@ -151,12 +166,12 @@ const WorkerDashboard = () => {
               <option value="Completed">Completed</option>
             </select>
           </div>
-          
+
           <div className="bg-gray-100 px-4 py-2 rounded-md">
             <span className="font-medium">Your Role:</span> {workerRole}
           </div>
         </div>
-        
+
         {isLoading ? (
           <div className="text-center py-8">
             <p>Loading maintenance requests...</p>
@@ -172,8 +187,8 @@ const WorkerDashboard = () => {
         ) : (
           <div className="grid gap-6">
             {requests.map((request) => (
-              <div 
-                key={request._id} 
+              <div
+                key={request._id}
                 className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => openRequestModal(request)}
               >
@@ -184,11 +199,15 @@ const WorkerDashboard = () => {
                       {request.category} • {request.location} • Room: {request.studentRegNumber}
                     </p>
                   </div>
-                  <span className={`px-3 py-1 text-sm rounded-full ${
-                    request.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                    request.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
+                  <span
+                    className={`px-3 py-1 text-sm rounded-full ${
+                      request.status === "Completed"
+                        ? "bg-green-100 text-green-800"
+                        : request.status === "In Progress"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
                     {request.status}
                   </span>
                 </div>
@@ -207,7 +226,7 @@ const WorkerDashboard = () => {
           </div>
         )}
       </main>
-      
+
       {/* Request Detail Modal */}
       {isModalOpen && selectedRequest && (
         <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -215,55 +234,66 @@ const WorkerDashboard = () => {
             <div className="p-6">
               <div className="flex justify-between items-start">
                 <h2 className="text-xl font-bold">{selectedRequest.title}</h2>
-                <button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                   </svg>
                 </button>
               </div>
-              
+
               <div className="mt-4 space-y-4">
                 <div>
                   <p className="text-sm font-medium text-gray-500">Status</p>
-                  <p className={`inline-block px-3 py-1 text-sm rounded-full mt-1 ${
-                    selectedRequest.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                    selectedRequest.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
+                  <p
+                    className={`inline-block px-3 py-1 text-sm rounded-full mt-1 ${
+                      selectedRequest.status === "Completed"
+                        ? "bg-green-100 text-green-800"
+                        : selectedRequest.status === "In Progress"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
                     {selectedRequest.status}
                   </p>
                 </div>
-                
+
                 <div>
                   <p className="text-sm font-medium text-gray-500">Category</p>
                   <p>{selectedRequest.category}</p>
                 </div>
-                
+
                 <div>
                   <p className="text-sm font-medium text-gray-500">Location</p>
                   <p>{selectedRequest.location}</p>
                 </div>
-                
+
                 <div>
                   <p className="text-sm font-medium text-gray-500">Description</p>
                   <p>{selectedRequest.description}</p>
                 </div>
-                
+
                 {selectedRequest.imageUrl && (
                   <div>
                     <p className="text-sm font-medium text-gray-500">Image</p>
-                    <img 
-                      src={`http://localhost:3001${selectedRequest.imageUrl}`} 
-                      alt="Request" 
+                    <img
+                      src={`http://localhost:3001${selectedRequest.imageUrl}`}
+                      alt="Request"
                       className="mt-2 max-h-60 rounded-md"
                     />
                   </div>
                 )}
-                
+
                 <div>
                   <p className="text-sm font-medium text-gray-500">Feedback</p>
                   <textarea
@@ -273,28 +303,28 @@ const WorkerDashboard = () => {
                     placeholder="Add your feedback or notes about this repair"
                   />
                 </div>
-                
+
                 <div className="pt-4 border-t flex justify-end space-x-3">
-                  {selectedRequest.status === 'Pending' && (
+                  {selectedRequest.status === "Pending" && (
                     <button
-                      onClick={() => handleUpdateStatus('In Progress')}
+                      onClick={() => handleUpdateStatus("In Progress")}
                       disabled={isUpdating}
                       className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
                     >
-                      {isUpdating ? 'Updating...' : 'Mark as In Progress'}
+                      {isUpdating ? "Updating..." : "Mark as In Progress"}
                     </button>
                   )}
-                  
-                  {(selectedRequest.status === 'Pending' || selectedRequest.status === 'In Progress') && (
+
+                  {(selectedRequest.status === "Pending" || selectedRequest.status === "In Progress") && (
                     <button
-                      onClick={() => handleUpdateStatus('Completed')}
+                      onClick={() => handleUpdateStatus("Completed")}
                       disabled={isUpdating}
                       className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
                     >
-                      {isUpdating ? 'Updating...' : 'Mark as Completed'}
+                      {isUpdating ? "Updating..." : "Mark as Completed"}
                     </button>
                   )}
-                  
+
                   <button
                     onClick={() => setIsModalOpen(false)}
                     className="border border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50"
@@ -308,7 +338,7 @@ const WorkerDashboard = () => {
         </div>
       )}
     </>
-  );
-};
+  )
+}
 
-export default WorkerDashboard;
+export default WorkerDashboard
