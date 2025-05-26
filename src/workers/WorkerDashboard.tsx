@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import { toast } from "react-hot-toast"
 import Header from "@/components/Header"
+import AvailableRequests from "./components/AvailableRequests"
 
 interface MaintenanceRequest {
   _id: string
@@ -43,6 +44,9 @@ const WorkerDashboard = () => {
     averageResolutionTime: 0,
     completedTasks: 0,
   })
+  const [isSavingFeedback, setIsSavingFeedback] = useState(false)
+  const [isDeletingFeedback, setIsDeletingFeedback] = useState(false)
+  const [activeTab, setActiveTab] = useState<"assigned" | "available">("assigned")
 
   const navigate = useNavigate()
 
@@ -58,7 +62,7 @@ const WorkerDashboard = () => {
         }
         setWorkerRole(parsedData.role)
         setWorkerId(parsedData.id)
-        fetchRequests(parsedData.role)
+        fetchRequests(parsedData.id) // Pass workerId instead of role
         fetchWorkerStats(parsedData.id)
       } catch (error) {
         console.error("Error parsing user data:", error)
@@ -71,24 +75,13 @@ const WorkerDashboard = () => {
     }
   }, [navigate])
 
-  const fetchRequests = async (role: string, status = "") => {
+  const fetchRequests = async (workerId: string, status = "") => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // Map worker roles to request categories
-      const roleToCategory: Record<string, string> = {
-        Electrician: "Electrical",
-        Plumber: "Plumbing",
-        Carpenter: "Carpenter",
-        Other: "Other",
-      }
-
-      // Use the mapped category or the original role if no mapping exists
-      const category = roleToCategory[role as keyof typeof roleToCategory] || role
-
-      console.log(`Fetching requests for category: ${category}`)
-      const url = `http://localhost:3001/api/worker/requests/${role}${status ? `?status=${status}` : ""}`
+      console.log(`Fetching assigned requests for worker ID: ${workerId}`)
+      const url = `http://localhost:3001/api/worker/requests/${workerId}${status ? `?status=${status}` : ""}`
 
       const response = await axios.get(url)
       setRequests(response.data)
@@ -161,7 +154,7 @@ const WorkerDashboard = () => {
     if (viewMode === "prioritized") {
       fetchPrioritizedRequests(workerRole, status)
     } else {
-      fetchRequests(workerRole, status)
+      fetchRequests(workerId, status) // Use workerId instead of workerRole
     }
   }
 
@@ -170,7 +163,64 @@ const WorkerDashboard = () => {
     if (mode === "prioritized") {
       fetchPrioritizedRequests(workerRole, statusFilter)
     } else {
-      fetchRequests(workerRole, statusFilter)
+      fetchRequests(workerId, statusFilter) // Use workerId instead of workerRole
+    }
+  }
+
+  const handleSaveFeedback = async () => {
+    if (!selectedRequest) return
+
+    setIsSavingFeedback(true)
+
+    try {
+      const response = await axios.patch(`http://localhost:3001/api/requests/${selectedRequest._id}/feedback`, {
+        workerFeedback: feedback,
+      })
+
+      if (response.status === 200) {
+        toast.success("Feedback saved successfully")
+
+        // Update the request in the local state
+        setRequests(
+          requests.map((req) => (req._id === selectedRequest._id ? { ...req, workerFeedback: feedback } : req)),
+        )
+
+        // Update selected request
+        setSelectedRequest({ ...selectedRequest, workerFeedback: feedback })
+      }
+    } catch (error) {
+      console.error("Error saving feedback:", error)
+      toast.error("Failed to save feedback")
+    } finally {
+      setIsSavingFeedback(false)
+    }
+  }
+
+  const handleDeleteFeedback = async () => {
+    if (!selectedRequest) return
+
+    setIsDeletingFeedback(true)
+
+    try {
+      const response = await axios.delete(`http://localhost:3001/api/requests/${selectedRequest._id}/feedback`)
+
+      if (response.status === 200) {
+        toast.success("Feedback deleted successfully")
+        setFeedback("")
+
+        // Update the request in the local state
+        setRequests(
+          requests.map((req) => (req._id === selectedRequest._id ? { ...req, workerFeedback: undefined } : req)),
+        )
+
+        // Update selected request
+        setSelectedRequest({ ...selectedRequest, workerFeedback: undefined })
+      }
+    } catch (error) {
+      console.error("Error deleting feedback:", error)
+      toast.error("Failed to delete feedback")
+    } finally {
+      setIsDeletingFeedback(false)
     }
   }
 
@@ -180,10 +230,13 @@ const WorkerDashboard = () => {
     setIsUpdating(true)
 
     try {
-      // If marking as completed, set the completedAt date
       const payload: any = {
         status: newStatus,
-        workerFeedback: feedback,
+      }
+
+      // Only include feedback if it exists
+      if (selectedRequest.workerFeedback) {
+        payload.workerFeedback = selectedRequest.workerFeedback
       }
 
       const response = await axios.patch(`http://localhost:3001/api/requests/${selectedRequest._id}`, payload)
@@ -196,7 +249,7 @@ const WorkerDashboard = () => {
         if (viewMode === "prioritized") {
           fetchPrioritizedRequests(workerRole, statusFilter)
         } else {
-          fetchRequests(workerRole, statusFilter)
+          fetchRequests(workerId, statusFilter) // Use workerId instead of workerRole
         }
 
         // Refresh worker stats if a task was completed
@@ -231,6 +284,10 @@ const WorkerDashboard = () => {
       default:
         return "bg-blue-100 text-blue-800"
     }
+  }
+
+  const refreshAssignedRequests = () => {
+    fetchRequests(workerId, statusFilter)
   }
 
   return (
@@ -282,46 +339,67 @@ const WorkerDashboard = () => {
 
         <div className="mb-6 flex flex-wrap justify-between items-center">
           <div className="flex flex-wrap gap-4 items-end">
-            <div>
-              <label htmlFor="viewMode" className="block text-sm font-medium mb-1">
-                View Mode:
-              </label>
-              <div className="flex rounded-md overflow-hidden border border-gray-300">
-                <button
-                  onClick={() => handleViewModeChange("standard")}
-                  className={`px-4 py-1.5 ${
-                    viewMode === "standard" ? "bg-black text-white" : "bg-white text-gray-700"
-                  }`}
-                >
-                  Standard
-                </button>
-                <button
-                  onClick={() => handleViewModeChange("prioritized")}
-                  className={`px-4 py-1.5 ${
-                    viewMode === "prioritized" ? "bg-black text-white" : "bg-white text-gray-700"
-                  }`}
-                >
-                  Prioritized
-                </button>
-              </div>
+            {/* Tab Navigation */}
+            <div className="flex rounded-md overflow-hidden border border-gray-300">
+              <button
+                onClick={() => setActiveTab("assigned")}
+                className={`px-4 py-2 ${activeTab === "assigned" ? "bg-black text-white" : "bg-white text-gray-700"}`}
+              >
+                My Requests
+              </button>
+              <button
+                onClick={() => setActiveTab("available")}
+                className={`px-4 py-2 ${activeTab === "available" ? "bg-black text-white" : "bg-white text-gray-700"}`}
+              >
+                Available Requests
+              </button>
             </div>
 
-            <div>
-              <label htmlFor="statusFilter" className="block text-sm font-medium mb-1">
-                Filter by status:
-              </label>
-              <select
-                id="statusFilter"
-                value={statusFilter}
-                onChange={handleStatusChange}
-                className="border border-gray-300 rounded-md px-3 py-1.5"
-              >
-                <option value="">All Requests</option>
-                <option value="Pending">Pending</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-              </select>
-            </div>
+            {/* Only show filters for assigned requests */}
+            {activeTab === "assigned" && (
+              <>
+                <div>
+                  <label htmlFor="viewMode" className="block text-sm font-medium mb-1">
+                    View Mode:
+                  </label>
+                  <div className="flex rounded-md overflow-hidden border border-gray-300">
+                    <button
+                      onClick={() => handleViewModeChange("standard")}
+                      className={`px-4 py-1.5 ${
+                        viewMode === "standard" ? "bg-black text-white" : "bg-white text-gray-700"
+                      }`}
+                    >
+                      Standard
+                    </button>
+                    <button
+                      onClick={() => handleViewModeChange("prioritized")}
+                      className={`px-4 py-1.5 ${
+                        viewMode === "prioritized" ? "bg-black text-white" : "bg-white text-gray-700"
+                      }`}
+                    >
+                      Prioritized
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="statusFilter" className="block text-sm font-medium mb-1">
+                    Filter by status:
+                  </label>
+                  <select
+                    id="statusFilter"
+                    value={statusFilter}
+                    onChange={handleStatusChange}
+                    className="border border-gray-300 rounded-md px-3 py-1.5"
+                  >
+                    <option value="">All Requests</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="bg-gray-100 px-4 py-2 rounded-md">
@@ -329,72 +407,79 @@ const WorkerDashboard = () => {
           </div>
         </div>
 
-        {isLoading ? (
-          <div className="text-center py-8">
-            <p>Loading maintenance requests...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-8 text-red-500">
-            <p>{error}</p>
-          </div>
-        ) : requests.length === 0 ? (
-          <div className="text-center py-8 bg-gray-50 rounded-lg">
-            <p className="text-gray-500">No maintenance requests found for your role.</p>
-          </div>
-        ) : (
-          <div className="grid gap-6">
-            {requests.map((request) => (
-              <div
-                key={request._id}
-                className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => openRequestModal(request)}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-bold text-lg">{request.title}</h3>
-                    <p className="text-sm text-gray-600">
-                      {request.category} • {request.location} • Room: {request.studentRegNumber}
-                    </p>
+        {/* Tab Content */}
+        {activeTab === "assigned" ? (
+          // Existing assigned requests content
+          isLoading ? (
+            <div className="text-center py-8">
+              <p>Loading maintenance requests...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8 text-red-500">
+              <p>{error}</p>
+            </div>
+          ) : requests.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <p className="text-gray-500">No maintenance requests assigned to you.</p>
+            </div>
+          ) : (
+            <div className="grid gap-6">
+              {requests.map((request) => (
+                <div
+                  key={request._id}
+                  className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => openRequestModal(request)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-bold text-lg">{request.title}</h3>
+                      <p className="text-sm text-gray-600">
+                        {request.category} • {request.location} • Student: {request.studentRegNumber}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <span
+                        className={`px-3 py-1 text-sm rounded-full ${getPriorityColor(request.priority || "Medium")}`}
+                      >
+                        {request.priority || "Medium"}
+                      </span>
+                      <span
+                        className={`px-3 py-1 text-sm rounded-full ${
+                          request.status === "Completed"
+                            ? "bg-green-100 text-green-800"
+                            : request.status === "In Progress"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-yellow-100 text-yellow-800"
+                        }`}
+                      >
+                        {request.status}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <span
-                      className={`px-3 py-1 text-sm rounded-full ${getPriorityColor(request.priority || "Medium")}`}
-                    >
-                      {request.priority || "Medium"}
-                    </span>
-                    <span
-                      className={`px-3 py-1 text-sm rounded-full ${
-                        request.status === "Completed"
-                          ? "bg-green-100 text-green-800"
-                          : request.status === "In Progress"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
-                      {request.status}
-                    </span>
-                  </div>
-                </div>
-                <p className="mt-2">{request.description}</p>
-                {request.workerFeedback && (
-                  <div className="mt-2 bg-gray-50 p-2 rounded">
-                    <p className="text-sm font-medium">Your feedback:</p>
-                    <p className="text-sm">{request.workerFeedback}</p>
-                  </div>
-                )}
-                <div className="mt-2 flex justify-between">
-                  <p className="text-xs text-gray-500">
-                    Submitted on {new Date(request.createdAt).toLocaleDateString()}
-                  </p>
-                  {viewMode === "prioritized" && request.priorityScore && (
-                    <p className="text-xs font-medium bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                      Priority Score: {request.priorityScore.toFixed(1)}
-                    </p>
+                  <p className="mt-2">{request.description}</p>
+                  {request.workerFeedback && (
+                    <div className="mt-2 bg-gray-50 p-2 rounded">
+                      <p className="text-sm font-medium">Your feedback:</p>
+                      <p className="text-sm">{request.workerFeedback}</p>
+                    </div>
                   )}
+                  <div className="mt-2 flex justify-between">
+                    <p className="text-xs text-gray-500">
+                      Submitted on {new Date(request.createdAt).toLocaleDateString()}
+                    </p>
+                    {viewMode === "prioritized" && request.priorityScore && (
+                      <p className="text-xs font-medium bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                        Priority Score: {request.priorityScore.toFixed(1)}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
+        ) : (
+          // Available requests tab
+          <AvailableRequests workerRole={workerRole} workerId={workerId} onRequestClaimed={refreshAssignedRequests} />
         )}
       </main>
 
@@ -469,11 +554,17 @@ const WorkerDashboard = () => {
                 {selectedRequest.imageUrl && (
                   <div>
                     <p className="text-sm font-medium text-gray-500">Image</p>
-                    <img
-                      src={`http://localhost:3001${selectedRequest.imageUrl}`}
-                      alt="Request"
-                      className="mt-2 max-h-60 rounded-md"
-                    />
+                    <div className="mt-2">
+                      <img
+                        src={`http://localhost:3001${selectedRequest.imageUrl}`}
+                        alt="Request"
+                        className="max-h-60 w-auto rounded-md shadow-sm border border-gray-200 object-cover"
+                        onError={(e) => {
+                          console.error("Image failed to load:", selectedRequest.imageUrl)
+                          e.currentTarget.style.display = "none"
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -485,6 +576,24 @@ const WorkerDashboard = () => {
                     className="w-full mt-1 border border-gray-300 rounded-md px-3 py-2 min-h-[100px]"
                     placeholder="Add your feedback or notes about this repair"
                   />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={handleSaveFeedback}
+                      disabled={isSavingFeedback || !feedback.trim()}
+                      className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
+                    >
+                      {isSavingFeedback ? "Saving..." : "Save Feedback"}
+                    </button>
+                    {selectedRequest?.workerFeedback && (
+                      <button
+                        onClick={handleDeleteFeedback}
+                        disabled={isDeletingFeedback}
+                        className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 disabled:opacity-50 text-sm"
+                      >
+                        {isDeletingFeedback ? "Deleting..." : "Delete Feedback"}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="pt-4 border-t flex justify-end space-x-3">

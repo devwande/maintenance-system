@@ -14,6 +14,7 @@ import { rateMaintenanceRequest } from "./services/workerPerformanceService.js"
 
 const app = express()
 
+// Serve static files from uploads directory
 app.use("/server/uploads", express.static("uploads"))
 
 const PORT = process.env.PORT || 3001
@@ -28,7 +29,6 @@ if (!JWT_SECRET) {
 
 app.use(
   cors({
-    // origin: 'http://localhost:5174',
     credentials: true,
   }),
 )
@@ -339,7 +339,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage })
 
-// Create maintenance request with auto-assignment
+// Create maintenance request with auto-assignment (but keep status as Pending)
 app.post("/api/requests", upload.single("image"), async (req, res) => {
   try {
     const requestData = {
@@ -348,16 +348,36 @@ app.post("/api/requests", upload.single("image"), async (req, res) => {
       imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
     }
 
+    console.log("Creating new request:", requestData)
+
     // Create the request
     const request = await MaintenanceRequest.create(requestData)
 
-    // Auto-assign to a worker if not already assigned
+    console.log("Request created with ID:", request._id)
+
+    // Auto-assign to a worker if not already assigned, but keep status as Pending
     if (!request.assignedTo && request.category) {
-      await assignWorkerToRequest(request._id)
+      console.log(`🔄 Starting auto-assignment for request ${request._id} with category: ${request.category}`)
+
+      const assignmentResult = await assignWorkerToRequest(request._id, false) // false = don't change status
+
+      console.log("Assignment result:", assignmentResult)
+
+      if (assignmentResult.success) {
+        console.log(`✅ Auto-assignment successful: ${assignmentResult.message}`)
+      } else {
+        console.log(`❌ Auto-assignment failed: ${assignmentResult.message}`)
+      }
+    } else {
+      console.log("Skipping auto-assignment - request already assigned or no category")
     }
 
-    res.status(201).json(request)
+    // Fetch the updated request with populated assignedTo field
+    const updatedRequest = await MaintenanceRequest.findById(request._id).populate("assignedTo", "name role")
+
+    res.status(201).json(updatedRequest)
   } catch (error) {
+    console.error("Error creating request:", error)
     res.status(500).json({ error: error.message })
   }
 })
@@ -373,7 +393,7 @@ app.get("/api/requests/:regNumber", async (req, res) => {
   }
 })
 
-// Get all requests (for admin)
+// Get all requests (for admin) with populated assignedTo
 app.get("/api/admin/requests", async (req, res) => {
   try {
     const { status, category } = req.query
@@ -388,7 +408,7 @@ app.get("/api/admin/requests", async (req, res) => {
       query.category = category
     }
 
-    const requests = await MaintenanceRequest.find(query).sort({ createdAt: -1 })
+    const requests = await MaintenanceRequest.find(query).populate("assignedTo", "name role").sort({ createdAt: -1 })
     res.json(requests)
   } catch (error) {
     console.error(error)
@@ -451,7 +471,7 @@ app.patch("/api/admin/assign/:id", async (req, res) => {
       id,
       { category: normalizedCategory },
       { new: true },
-    )
+    ).populate("assignedTo", "name role")
 
     if (!updatedRequest) {
       return res.status(404).json({ error: "Request not found" })
@@ -464,13 +484,42 @@ app.patch("/api/admin/assign/:id", async (req, res) => {
   }
 })
 
-// Worker requests endpoint
-app.get("/api/worker/requests/:role", async (req, res) => {
+// Replace the worker requests endpoint with this corrected version:
+
+// Worker requests endpoint - show only assigned requests
+app.get("/api/worker/requests/:workerId", async (req, res) => {
+  try {
+    const { workerId } = req.params
+    const { status } = req.query
+
+    console.log(`Fetching requests for worker ID: ${workerId}`)
+
+    // Build the query to find requests assigned to this specific worker
+    const query = { assignedTo: workerId }
+    if (status) {
+      query.status = status
+    }
+
+    console.log("Query:", query)
+
+    const requests = await MaintenanceRequest.find(query).populate("assignedTo", "name role").sort({ createdAt: -1 })
+
+    console.log(`Found ${requests.length} assigned requests`)
+
+    res.json(requests)
+  } catch (error) {
+    console.error("Error fetching worker requests:", error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Add new endpoint for workers to see available requests in their category
+app.get("/api/worker/available-requests/:role", async (req, res) => {
   try {
     const { role } = req.params
     const { status } = req.query
 
-    console.log(`Worker role received: ${role}`)
+    console.log(`Fetching available requests for role: ${role}`)
 
     // Create a mapping between worker roles and request categories
     const roleToCategoryMap = {
@@ -481,25 +530,24 @@ app.get("/api/worker/requests/:role", async (req, res) => {
       Other: "Other",
     }
 
-    // Get the corresponding category for this role
     const category = roleToCategoryMap[role] || role
 
-    console.log(`Looking for requests with category: ${category}`)
-
-    // Build the query
-    const query = { category }
+    // Build query for unassigned requests in this category
+    const query = {
+      category,
+      assignedTo: { $exists: false }, // Only unassigned requests
+    }
     if (status) {
       query.status = status
     }
 
-    console.log("Query:", query)
-
     const requests = await MaintenanceRequest.find(query).sort({ createdAt: -1 })
-    console.log(`Found ${requests.length} requests`)
+
+    console.log(`Found ${requests.length} available requests`)
 
     res.json(requests)
   } catch (error) {
-    console.error("Error fetching worker requests:", error)
+    console.error("Error fetching available requests:", error)
     res.status(500).json({ error: error.message })
   }
 })
@@ -529,11 +577,55 @@ app.patch("/api/requests/:id", async (req, res) => {
     }
 
     request.status = status
-    if (workerFeedback) {
+    if (workerFeedback !== undefined) {
       request.workerFeedback = workerFeedback
     }
 
     await request.save()
+
+    res.json(request)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Add feedback to a request
+app.patch("/api/requests/:id/feedback", async (req, res) => {
+  try {
+    const { id } = req.params
+    const { workerFeedback } = req.body
+
+    const request = await MaintenanceRequest.findByIdAndUpdate(id, { workerFeedback }, { new: true }).populate(
+      "assignedTo",
+      "name role",
+    )
+
+    if (!request) {
+      return res.status(404).json({ error: "Request not found" })
+    }
+
+    res.json(request)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete feedback from a request
+app.delete("/api/requests/:id/feedback", async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const request = await MaintenanceRequest.findByIdAndUpdate(
+      id,
+      { $unset: { workerFeedback: "" } },
+      { new: true },
+    ).populate("assignedTo", "name role")
+
+    if (!request) {
+      return res.status(404).json({ error: "Request not found" })
+    }
 
     res.json(request)
   } catch (error) {
@@ -568,6 +660,52 @@ app.get("/api/admin/worker-statistics", async (req, res) => {
     res.json(workerStats)
   } catch (error) {
     console.error(error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Test endpoint to check worker distribution
+app.get("/api/test/worker-distribution", async (req, res) => {
+  try {
+    const workers = await WorkerModel.find({}, "name role")
+
+    const distribution = await Promise.all(
+      workers.map(async (worker) => {
+        const pendingCount = await MaintenanceRequest.countDocuments({
+          assignedTo: worker._id,
+          status: "Pending",
+        })
+
+        const inProgressCount = await MaintenanceRequest.countDocuments({
+          assignedTo: worker._id,
+          status: "In Progress",
+        })
+
+        const completedCount = await MaintenanceRequest.countDocuments({
+          assignedTo: worker._id,
+          status: "Completed",
+        })
+
+        return {
+          workerId: worker._id,
+          name: worker.name,
+          role: worker.role,
+          pending: pendingCount,
+          inProgress: inProgressCount,
+          completed: completedCount,
+          active: pendingCount + inProgressCount,
+          total: pendingCount + inProgressCount + completedCount,
+        }
+      }),
+    )
+
+    res.json({
+      message: "Worker distribution analysis",
+      workers: distribution,
+      totalWorkers: workers.length,
+    })
+  } catch (error) {
+    console.error("Error getting worker distribution:", error)
     res.status(500).json({ error: error.message })
   }
 })

@@ -473,7 +473,11 @@ const StudentDashboard = () => {
                     <img
                       src={`http://localhost:3001${request.imageUrl}`}
                       alt="Request"
-                      className="max-h-40 rounded-md object-cover"
+                      className="max-h-40 w-auto rounded-md object-cover shadow-sm border border-gray-200"
+                      onError={(e) => {
+                        console.error("Image failed to load:", request.imageUrl)
+                        e.currentTarget.style.display = "none"
+                      }}
                     />
                   </div>
                 )}
