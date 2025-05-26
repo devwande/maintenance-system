@@ -29,10 +29,33 @@ interface MaintenanceRequest {
   location: string
   description: string
   status: string
+  priority: string
+  priorityScore?: number
   createdAt: string
   studentRegNumber: string
   imageUrl?: string
   workerFeedback?: string
+  assignedTo?: {
+    _id: string
+    name: string
+    role: string
+  }
+  rating?: number
+}
+
+interface WorkerStats {
+  _id: string
+  name: string
+  role: string
+  performanceScore: number
+  averageRating: number
+  averageResolutionTime: number
+  workload: {
+    pending: number
+    inProgress: number
+    completed: number
+    total: number
+  }
 }
 
 interface DashboardStats {
@@ -52,6 +75,7 @@ const AdminDashboard = () => {
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>("")
   const [categoryFilter, setCategoryFilter] = useState<string>("")
+  const [priorityFilter, setPriorityFilter] = useState<string>("")
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isAssigning, setIsAssigning] = useState(false)
@@ -62,6 +86,8 @@ const AdminDashboard = () => {
     completed: 0,
     categories: {},
   })
+  const [workerStats, setWorkerStats] = useState<WorkerStats[]>([])
+  const [viewMode, setViewMode] = useState<"standard" | "prioritized">("standard")
 
   const navigate = useNavigate()
 
@@ -76,6 +102,7 @@ const AdminDashboard = () => {
           return
         }
         fetchRequests()
+        fetchWorkerStats()
       } catch (error) {
         console.error("Error parsing user data:", error)
         setError("Could not load user data. Please log in again.")
@@ -92,7 +119,7 @@ const AdminDashboard = () => {
       applyFilters()
       calculateStats()
     }
-  }, [requests, statusFilter, categoryFilter])
+  }, [requests, statusFilter, categoryFilter, priorityFilter])
 
   const fetchRequests = async () => {
     setIsLoading(true)
@@ -109,6 +136,41 @@ const AdminDashboard = () => {
     }
   }
 
+  const fetchPrioritizedRequests = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      let url = "http://localhost:3001/api/admin/prioritized-requests"
+      const params = new URLSearchParams()
+
+      if (statusFilter) params.append("status", statusFilter)
+      if (categoryFilter) params.append("category", categoryFilter)
+
+      if (params.toString()) {
+        url += `?${params.toString()}`
+      }
+
+      const response = await axios.get(url)
+      setRequests(response.data)
+      setFilteredRequests(response.data)
+    } catch (error) {
+      console.error("Error fetching prioritized requests:", error)
+      setError("Failed to load prioritized maintenance requests. Please try again later.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchWorkerStats = async () => {
+    try {
+      const response = await axios.get("http://localhost:3001/api/admin/worker-statistics")
+      setWorkerStats(response.data)
+    } catch (error) {
+      console.error("Error fetching worker statistics:", error)
+    }
+  }
+
   const applyFilters = () => {
     let filtered = [...requests]
 
@@ -118,6 +180,10 @@ const AdminDashboard = () => {
 
     if (categoryFilter) {
       filtered = filtered.filter((request) => request.category === categoryFilter)
+    }
+
+    if (priorityFilter) {
+      filtered = filtered.filter((request) => request.priority === priorityFilter)
     }
 
     setFilteredRequests(filtered)
@@ -157,6 +223,19 @@ const AdminDashboard = () => {
     setCategoryFilter(e.target.value)
   }
 
+  const handlePriorityFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setPriorityFilter(e.target.value)
+  }
+
+  const handleViewModeChange = (mode: "standard" | "prioritized") => {
+    setViewMode(mode)
+    if (mode === "prioritized") {
+      fetchPrioritizedRequests()
+    } else {
+      fetchRequests()
+    }
+  }
+
   const openRequestModal = (request: MaintenanceRequest) => {
     setSelectedRequest(request)
     setIsModalOpen(true)
@@ -175,11 +254,43 @@ const AdminDashboard = () => {
       if (response.status === 200) {
         toast.success(`Request reassigned to ${newCategory}`)
         setIsModalOpen(false)
-        fetchRequests()
+        if (viewMode === "prioritized") {
+          fetchPrioritizedRequests()
+        } else {
+          fetchRequests()
+        }
+        fetchWorkerStats()
       }
     } catch (error) {
       console.error("Error reassigning request:", error)
       toast.error("Failed to reassign request")
+    } finally {
+      setIsAssigning(false)
+    }
+  }
+
+  const handleUpdatePriority = async (newPriority: string) => {
+    if (!selectedRequest) return
+
+    setIsAssigning(true)
+
+    try {
+      const response = await axios.patch(`http://localhost:3001/api/admin/priority/${selectedRequest._id}`, {
+        priority: newPriority,
+      })
+
+      if (response.status === 200) {
+        toast.success(`Priority updated to ${newPriority}`)
+        setIsModalOpen(false)
+        if (viewMode === "prioritized") {
+          fetchPrioritizedRequests()
+        } else {
+          fetchRequests()
+        }
+      }
+    } catch (error) {
+      console.error("Error updating priority:", error)
+      toast.error("Failed to update priority")
     } finally {
       setIsAssigning(false)
     }
@@ -192,10 +303,28 @@ const AdminDashboard = () => {
       Location: request.location,
       Description: request.description,
       Status: request.status,
+      Priority: request.priority,
       Student: request.studentRegNumber,
+      "Assigned To": request.assignedTo?.name || "Not assigned",
       "Submitted On": new Date(request.createdAt).toLocaleDateString(),
+      Rating: request.rating || "Not rated",
       Feedback: request.workerFeedback || "N/A",
     }))
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "Critical":
+        return "bg-red-100 text-red-800"
+      case "High":
+        return "bg-orange-100 text-orange-800"
+      case "Medium":
+        return "bg-blue-100 text-blue-800"
+      case "Low":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-blue-100 text-blue-800"
+    }
   }
 
   return (
@@ -239,6 +368,96 @@ const AdminDashboard = () => {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Worker Performance Stats */}
+        <div className="bg-white p-6 rounded-lg shadow mb-8">
+          <h3 className="font-bold text-xl mb-4">Worker Performance</h3>
+
+          {workerStats.length === 0 ? (
+            <p className="text-gray-500">No worker performance data available.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Worker
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Role
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Performance Score
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Avg. Rating
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Avg. Resolution Time
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Current Workload
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {workerStats.map((worker) => (
+                    <tr key={worker._id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{worker.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">{worker.role}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div
+                              className="bg-blue-600 h-2.5 rounded-full"
+                              style={{ width: `${Math.min(worker.performanceScore * 20, 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className="ml-2 text-sm text-gray-700">{worker.performanceScore.toFixed(1)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {worker.averageRating ? worker.averageRating.toFixed(1) : "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {worker.averageResolutionTime ? `${worker.averageResolutionTime.toFixed(1)} hrs` : "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{worker.workload.inProgress} in progress</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Analytics Dashboard */}
@@ -305,6 +524,30 @@ const AdminDashboard = () => {
         <div className="mb-6 flex flex-wrap gap-4 justify-between">
           <div className="flex flex-wrap gap-4">
             <div>
+              <label htmlFor="viewMode" className="block text-sm font-medium mb-1">
+                View Mode:
+              </label>
+              <div className="flex rounded-md overflow-hidden border border-gray-300">
+                <button
+                  onClick={() => handleViewModeChange("standard")}
+                  className={`px-4 py-1.5 ${
+                    viewMode === "standard" ? "bg-black text-white" : "bg-white text-gray-700"
+                  }`}
+                >
+                  Standard
+                </button>
+                <button
+                  onClick={() => handleViewModeChange("prioritized")}
+                  className={`px-4 py-1.5 ${
+                    viewMode === "prioritized" ? "bg-black text-white" : "bg-white text-gray-700"
+                  }`}
+                >
+                  Prioritized
+                </button>
+              </div>
+            </div>
+
+            <div>
               <label htmlFor="statusFilter" className="block text-sm font-medium mb-1">
                 Filter by status:
               </label>
@@ -338,6 +581,24 @@ const AdminDashboard = () => {
                 <option value="HVAC">HVAC</option>
                 <option value="Furniture">Furniture</option>
                 <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="priorityFilter" className="block text-sm font-medium mb-1">
+                Filter by priority:
+              </label>
+              <select
+                id="priorityFilter"
+                value={priorityFilter}
+                onChange={handlePriorityFilterChange}
+                className="border border-gray-300 rounded-md px-3 py-1.5"
+              >
+                <option value="">All Priorities</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
               </select>
             </div>
           </div>
@@ -396,28 +657,50 @@ const AdminDashboard = () => {
                       {request.category} • {request.location} • Student: {request.studentRegNumber}
                     </p>
                   </div>
-                  <span
-                    className={`px-3 py-1 text-sm rounded-full ${
-                      request.status === "Completed"
-                        ? "bg-green-100 text-green-800"
-                        : request.status === "In Progress"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {request.status}
-                  </span>
+                  <div className="flex gap-2">
+                    <span
+                      className={`px-3 py-1 text-sm rounded-full ${getPriorityColor(request.priority || "Medium")}`}
+                    >
+                      {request.priority || "Medium"}
+                    </span>
+                    <span
+                      className={`px-3 py-1 text-sm rounded-full ${
+                        request.status === "Completed"
+                          ? "bg-green-100 text-green-800"
+                          : request.status === "In Progress"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {request.status}
+                    </span>
+                  </div>
                 </div>
                 <p className="mt-2">{request.description}</p>
+                {request.assignedTo && (
+                  <div className="mt-2 bg-blue-50 p-2 rounded">
+                    <p className="text-sm font-medium">Assigned to:</p>
+                    <p className="text-sm">
+                      {request.assignedTo.name} ({request.assignedTo.role})
+                    </p>
+                  </div>
+                )}
                 {request.workerFeedback && (
                   <div className="mt-2 bg-gray-50 p-2 rounded">
                     <p className="text-sm font-medium">Worker feedback:</p>
                     <p className="text-sm">{request.workerFeedback}</p>
                   </div>
                 )}
-                <p className="mt-2 text-xs text-gray-500">
-                  Submitted on {new Date(request.createdAt).toLocaleDateString()}
-                </p>
+                <div className="mt-2 flex justify-between">
+                  <p className="text-xs text-gray-500">
+                    Submitted on {new Date(request.createdAt).toLocaleDateString()}
+                  </p>
+                  {viewMode === "prioritized" && request.priorityScore && (
+                    <p className="text-xs font-medium bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                      Priority Score: {request.priorityScore.toFixed(1)}
+                    </p>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -450,19 +733,31 @@ const AdminDashboard = () => {
               </div>
 
               <div className="mt-4 space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Status</p>
-                  <p
-                    className={`inline-block px-3 py-1 text-sm rounded-full mt-1 ${
-                      selectedRequest.status === "Completed"
-                        ? "bg-green-100 text-green-800"
-                        : selectedRequest.status === "In Progress"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {selectedRequest.status}
-                  </p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-500">Status</p>
+                    <p
+                      className={`inline-block px-3 py-1 text-sm rounded-full mt-1 ${
+                        selectedRequest.status === "Completed"
+                          ? "bg-green-100 text-green-800"
+                          : selectedRequest.status === "In Progress"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {selectedRequest.status}
+                    </p>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-500">Priority</p>
+                    <p
+                      className={`inline-block px-3 py-1 text-sm rounded-full mt-1 ${getPriorityColor(
+                        selectedRequest.priority || "Medium",
+                      )}`}
+                    >
+                      {selectedRequest.priority || "Medium"}
+                    </p>
+                  </div>
                 </div>
 
                 <div>
@@ -502,6 +797,56 @@ const AdminDashboard = () => {
                     <p className="bg-gray-50 p-2 rounded mt-1">{selectedRequest.workerFeedback}</p>
                   </div>
                 )}
+
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Update Priority</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleUpdatePriority("Critical")}
+                      disabled={isAssigning || selectedRequest.priority === "Critical"}
+                      className={`px-3 py-1.5 rounded-md ${
+                        selectedRequest.priority === "Critical"
+                          ? "bg-gray-200 text-gray-700"
+                          : "bg-red-100 text-red-700 hover:bg-red-200"
+                      }`}
+                    >
+                      Critical
+                    </button>
+                    <button
+                      onClick={() => handleUpdatePriority("High")}
+                      disabled={isAssigning || selectedRequest.priority === "High"}
+                      className={`px-3 py-1.5 rounded-md ${
+                        selectedRequest.priority === "High"
+                          ? "bg-gray-200 text-gray-700"
+                          : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                      }`}
+                    >
+                      High
+                    </button>
+                    <button
+                      onClick={() => handleUpdatePriority("Medium")}
+                      disabled={isAssigning || selectedRequest.priority === "Medium"}
+                      className={`px-3 py-1.5 rounded-md ${
+                        selectedRequest.priority === "Medium"
+                          ? "bg-gray-200 text-gray-700"
+                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      }`}
+                    >
+                      Medium
+                    </button>
+                    <button
+                      onClick={() => handleUpdatePriority("Low")}
+                      disabled={isAssigning || selectedRequest.priority === "Low"}
+                      className={`px-3 py-1.5 rounded-md ${
+                        selectedRequest.priority === "Low"
+                          ? "bg-gray-200 text-gray-700"
+                          : "bg-green-100 text-green-700 hover:bg-green-200"
+                      }`}
+                    >
+                      Low
+                    </button>
+                  </div>
+                </div>
 
                 <div>
                   <p className="text-sm font-medium text-gray-500">Reassign Category</p>

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
-import { PlusIcon, X, Bell } from "lucide-react"
+import { PlusIcon, X, Bell, Star } from "lucide-react"
 import Header from "./components/header"
 import axios from "axios"
 
@@ -12,6 +12,7 @@ interface FormData {
   category: string
   location: string
   description: string
+  priority: string
   image: File | null
 }
 
@@ -22,9 +23,11 @@ interface MaintenanceRequest {
   location: string
   description: string
   status: string
+  priority: string
   createdAt: string
   imageUrl?: string
   workerFeedback?: string
+  rating?: number
 }
 
 const StudentDashboard = () => {
@@ -34,6 +37,7 @@ const StudentDashboard = () => {
     category: "",
     location: "",
     description: "",
+    priority: "Medium",
     image: null,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -43,6 +47,10 @@ const StudentDashboard = () => {
   const [error, setError] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<{ id: string; message: string; read: boolean }[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
+  const [ratingModalOpen, setRatingModalOpen] = useState(false)
+  const [selectedRequestForRating, setSelectedRequestForRating] = useState<MaintenanceRequest | null>(null)
+  const [currentRating, setCurrentRating] = useState<number>(0)
+  const [isRatingSubmitting, setIsRatingSubmitting] = useState(false)
 
   useEffect(() => {
     // Get student data from localStorage
@@ -113,6 +121,7 @@ const StudentDashboard = () => {
       category: "",
       location: "",
       description: "",
+      priority: "Medium",
       image: null,
     })
   }
@@ -139,20 +148,12 @@ const StudentDashboard = () => {
       formDataToSend.append("category", formData.category)
       formDataToSend.append("location", formData.location)
       formDataToSend.append("description", formData.description)
+      formDataToSend.append("priority", formData.priority)
       formDataToSend.append("studentRegNumber", studentRegNumber)
 
       if (formData.image) {
         formDataToSend.append("image", formData.image)
       }
-
-      // For debugging - log the form data before sending
-      console.log("Form submitted:", {
-        title: formData.title,
-        category: formData.category,
-        location: formData.location,
-        description: formData.description,
-        hasImage: !!formData.image,
-      })
 
       // Submit to backend
       await axios.post(`http://localhost:3001/api/requests`, formDataToSend, {
@@ -176,6 +177,57 @@ const StudentDashboard = () => {
       setError("Failed to submit request. Please try again.")
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const openRatingModal = (request: MaintenanceRequest) => {
+    setSelectedRequestForRating(request)
+    setCurrentRating(request.rating || 0)
+    setRatingModalOpen(true)
+  }
+
+  const handleRatingChange = (rating: number) => {
+    setCurrentRating(rating)
+  }
+
+  const submitRating = async () => {
+    if (!selectedRequestForRating || currentRating === 0) return
+
+    setIsRatingSubmitting(true)
+
+    try {
+      const response = await axios.post(`http://localhost:3001/api/requests/${selectedRequestForRating._id}/rate`, {
+        rating: currentRating,
+      })
+
+      if (response.data.success) {
+        // Update the request in the local state
+        setRequests(
+          requests.map((req) => (req._id === selectedRequestForRating._id ? { ...req, rating: currentRating } : req)),
+        )
+
+        setRatingModalOpen(false)
+      }
+    } catch (error) {
+      console.error("Error submitting rating:", error)
+      setError("Failed to submit rating. Please try again.")
+    } finally {
+      setIsRatingSubmitting(false)
+    }
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "Critical":
+        return "bg-red-100 text-red-800"
+      case "High":
+        return "bg-orange-100 text-orange-800"
+      case "Medium":
+        return "bg-blue-100 text-blue-800"
+      case "Low":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-blue-100 text-blue-800"
     }
   }
 
@@ -283,12 +335,31 @@ const StudentDashboard = () => {
                   required
                 >
                   <option value="">Select a category</option>
-                  <option value="Electrician">Electrical</option>
+                  <option value="Electrical">Electrical</option>
                   <option value="Carpenter">Carpenter</option>
                   <option value="Plumbing">Plumbing</option>
                   <option value="HVAC">HVAC</option>
                   <option value="Other">Other</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  required
+                >
+                  <option value="Low">Low - Can be fixed when convenient</option>
+                  <option value="Medium">Medium - Should be fixed soon</option>
+                  <option value="High">High - Needs prompt attention</option>
+                  <option value="Critical">Critical - Urgent safety or security issue</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Please select the appropriate priority level for your issue.
+                </p>
               </div>
 
               <div>
@@ -377,17 +448,24 @@ const StudentDashboard = () => {
                       {request.category} • {request.location}
                     </p>
                   </div>
-                  <span
-                    className={`px-2 py-1 text-xs rounded-full ${
-                      request.status === "Completed"
-                        ? "bg-green-100 text-green-800"
-                        : request.status === "In Progress"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {request.status}
-                  </span>
+                  <div className="flex gap-2">
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${getPriorityColor(request.priority || "Medium")}`}
+                    >
+                      {request.priority || "Medium"}
+                    </span>
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        request.status === "Completed"
+                          ? "bg-green-100 text-green-800"
+                          : request.status === "In Progress"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {request.status}
+                    </span>
+                  </div>
                 </div>
                 <p className="mt-2 text-sm">{request.description}</p>
                 {request.imageUrl && (
@@ -405,14 +483,83 @@ const StudentDashboard = () => {
                     <p className="text-sm">{request.workerFeedback}</p>
                   </div>
                 )}
-                <p className="mt-2 text-xs text-gray-500">
-                  Submitted on {new Date(request.createdAt).toLocaleDateString()}
-                </p>
+                <div className="mt-2 flex justify-between items-center">
+                  <p className="text-xs text-gray-500">
+                    Submitted on {new Date(request.createdAt).toLocaleDateString()}
+                  </p>
+
+                  {request.status === "Completed" && (
+                    <div>
+                      {request.rating ? (
+                        <div className="flex items-center">
+                          <p className="text-sm mr-2">Your rating:</p>
+                          <div className="flex">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                size={16}
+                                className={
+                                  star <= (request.rating || 0) ? "text-yellow-500 fill-yellow-500" : "text-gray-300"
+                                }
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => openRatingModal(request)}
+                          className="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-100"
+                        >
+                          Rate this service
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
       </section>
+
+      {/* Rating Modal */}
+      {ratingModalOpen && selectedRequestForRating && (
+        <div className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            <h2 className="text-xl font-bold mb-4">Rate this service</h2>
+            <p className="mb-4">How would you rate the maintenance service for "{selectedRequestForRating.title}"?</p>
+
+            <div className="flex justify-center mb-6">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button key={star} type="button" onClick={() => handleRatingChange(star)} className="p-1">
+                  <Star
+                    size={32}
+                    className={star <= currentRating ? "text-yellow-500 fill-yellow-500" : "text-gray-300"}
+                  />
+                </button>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setRatingModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitRating}
+                disabled={currentRating === 0 || isRatingSubmitting}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {isRatingSubmitting ? "Submitting..." : "Submit Rating"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
