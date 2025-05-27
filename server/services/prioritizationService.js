@@ -26,7 +26,6 @@ export const calculatePriorityScore = (request) => {
   const categoryWeights = {
     Electrical: 1.2, // Electrical issues might be more urgent
     Plumbing: 1.1,
-    HVAC: 1.1,
     Carpenter: 0.9,
     Other: 0.8,
   }

@@ -127,7 +127,6 @@ app.get("/api/worker/available-requests/:role", async (req, res) => {
       Electrician: "Electrical",
       Plumber: "Plumbing",
       Carpenter: "Carpenter",
-      HVAC: "HVAC",
       Other: "Other",
     }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import axios from "axios"
 import { toast } from "react-hot-toast"
+import RequestImage from "../../components/RequestImage"
 
 interface MaintenanceRequest {
   _id: string
@@ -14,7 +15,8 @@ interface MaintenanceRequest {
   priority: string
   createdAt: string
   studentRegNumber: string
-  imageUrl?: string
+  imageData?: string
+  imageContentType?: string
 }
 
 interface AvailableRequestsProps {
@@ -47,7 +49,6 @@ const AvailableRequests = ({ workerRole, workerId, onRequestClaimed }: Available
   const claimRequest = async (requestId: string) => {
     setIsClaimingRequest(requestId)
     try {
-      // Assign the request to this worker
       const response = await axios.patch(`http://localhost:3001/api/requests/${requestId}`, {
         assignedTo: workerId,
         assignedAt: new Date(),
@@ -56,8 +57,8 @@ const AvailableRequests = ({ workerRole, workerId, onRequestClaimed }: Available
 
       if (response.status === 200) {
         toast.success("Request claimed successfully!")
-        fetchAvailableRequests() // Refresh available requests
-        onRequestClaimed() // Refresh assigned requests
+        fetchAvailableRequests()
+        onRequestClaimed()
       }
     } catch (error) {
       console.error("Error claiming request:", error)
@@ -119,19 +120,14 @@ const AvailableRequests = ({ workerRole, workerId, onRequestClaimed }: Available
               </button>
             </div>
           </div>
-          {request.imageUrl && (
+
+          {/* Image Display */}
+          {request.imageData && (
             <div className="mt-2">
-              <img
-                src={`http://localhost:3001${request.imageUrl}`}
-                alt="Request"
-                className="max-h-40 w-auto rounded-md shadow-sm border border-gray-200 object-cover"
-                onError={(e) => {
-                  console.error("Image failed to load:", request.imageUrl)
-                  e.currentTarget.style.display = "none"
-                }}
-              />
+              <RequestImage requestId={request._id} requestTitle={request.title} className="inline-block" />
             </div>
           )}
+
           <div className="mt-2">
             <p className="text-xs text-gray-500">Submitted on {new Date(request.createdAt).toLocaleDateString()}</p>
           </div>

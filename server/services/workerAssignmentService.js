@@ -6,7 +6,6 @@ const roleToCategoryMap = {
   Electrician: "Electrical",
   Plumber: "Plumbing",
   Carpenter: "Carpenter",
-  HVAC: "HVAC",
   Other: "Other",
 }
 
@@ -15,7 +14,6 @@ const categoryToRoleMap = {
   Electrical: "Electrician",
   Plumbing: "Plumber",
   Carpenter: "Carpenter",
-  HVAC: "HVAC",
   Other: "Other",
 }
 

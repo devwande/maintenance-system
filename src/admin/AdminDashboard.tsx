@@ -1,12 +1,11 @@
 "use client"
 
-import type React from "react"
-
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import { toast } from "react-hot-toast"
 import Header from "@/components/Header"
+import RequestImage from "@/components/RequestImage"
 import {
   BarChart,
   Bar,
@@ -21,6 +20,8 @@ import {
   Cell,
 } from "recharts"
 import { CSVLink } from "react-csv"
+import { saveAs } from "file-saver"
+import * as XLSX from "xlsx"
 
 interface MaintenanceRequest {
   _id: string
@@ -33,6 +34,8 @@ interface MaintenanceRequest {
   priorityScore?: number
   createdAt: string
   studentRegNumber: string
+  imageData?: string
+  imageContentType?: string
   imageUrl?: string
   workerFeedback?: string
   assignedTo?: {
@@ -68,11 +71,34 @@ interface DashboardStats {
   }
 }
 
+interface Worker {
+  _id: string
+  name: string
+  role: string
+  performanceScore?: number
+  averageRating?: number
+  averageResolutionTime?: number
+  workload?: {
+    pending: number
+    inProgress: number
+    completed: number
+    total: number
+    active: number
+  }
+}
+
+interface AlertState {
+  open: boolean
+  message: string
+  severity: "success" | "error" | "warning" | "info"
+}
+
 const AdminDashboard = () => {
   const [requests, setRequests] = useState<MaintenanceRequest[]>([])
   const [filteredRequests, setFilteredRequests] = useState<MaintenanceRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
   const [categoryFilter, setCategoryFilter] = useState<string>("")
   const [priorityFilter, setPriorityFilter] = useState<string>("")
@@ -87,9 +113,19 @@ const AdminDashboard = () => {
     categories: {},
   })
   const [workerStats, setWorkerStats] = useState<WorkerStats[]>([])
+  const [workers, setWorkers] = useState<Worker[]>([])
+  const [selectedWorker, setSelectedWorker] = useState<string>("")
   const [viewMode, setViewMode] = useState<"standard" | "prioritized">("standard")
+  const [displayMode, setDisplayMode] = useState<"cards" | "table">("cards")
+  const [page, setPage] = useState<number>(1)
+  const [rowsPerPage] = useState<number>(10)
+  const [alert, setAlert] = useState<AlertState>({ open: false, message: "", severity: "success" })
 
   const navigate = useNavigate()
+
+  const categories = ["Electrical", "Plumbing", "Carpenter", "HVAC", "Furniture", "Other"]
+  const statuses = ["Pending", "In Progress", "Completed", "Cancelled"]
+  const priorities = ["Critical", "High", "Medium", "Low"]
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -103,6 +139,7 @@ const AdminDashboard = () => {
         }
         fetchRequests()
         fetchWorkerStats()
+        fetchWorkers()
       } catch (error) {
         console.error("Error parsing user data:", error)
         setError("Could not load user data. Please log in again.")
@@ -119,7 +156,7 @@ const AdminDashboard = () => {
       applyFilters()
       calculateStats()
     }
-  }, [requests, statusFilter, categoryFilter, priorityFilter])
+  }, [requests, searchTerm, statusFilter, categoryFilter, priorityFilter])
 
   const fetchRequests = async () => {
     setIsLoading(true)
@@ -171,8 +208,28 @@ const AdminDashboard = () => {
     }
   }
 
+  const fetchWorkers = async (): Promise<void> => {
+    try {
+      const response = await fetch("http://localhost:3001/api/admin/worker-statistics")
+      const data: Worker[] = await response.json()
+      setWorkers(data)
+    } catch (error) {
+      console.error("Error fetching workers:", error)
+      showAlert("Failed to fetch workers", "error")
+    }
+  }
+
   const applyFilters = () => {
     let filtered = [...requests]
+
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (request) =>
+          request.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          request.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          request.studentRegNumber.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    }
 
     if (statusFilter) {
       filtered = filtered.filter((request) => request.status === statusFilter)
@@ -187,6 +244,7 @@ const AdminDashboard = () => {
     }
 
     setFilteredRequests(filtered)
+    setPage(1)
   }
 
   const calculateStats = () => {
@@ -215,18 +273,6 @@ const AdminDashboard = () => {
     setStats(newStats)
   }
 
-  const handleStatusFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setStatusFilter(e.target.value)
-  }
-
-  const handleCategoryFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setCategoryFilter(e.target.value)
-  }
-
-  const handlePriorityFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setPriorityFilter(e.target.value)
-  }
-
   const handleViewModeChange = (mode: "standard" | "prioritized") => {
     setViewMode(mode)
     if (mode === "prioritized") {
@@ -239,6 +285,7 @@ const AdminDashboard = () => {
   const openRequestModal = (request: MaintenanceRequest) => {
     setSelectedRequest(request)
     setIsModalOpen(true)
+    setSelectedWorker(request.assignedTo ? request.assignedTo._id : "")
   }
 
   const handleAssignCategory = async (newCategory: string) => {
@@ -296,6 +343,44 @@ const AdminDashboard = () => {
     }
   }
 
+  const handleAssignWorker = async (): Promise<void> => {
+    if (!selectedRequest) return
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/requests/${selectedRequest._id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          assignedTo: selectedWorker,
+          assignedAt: new Date(),
+          status: selectedWorker ? "In Progress" : "Pending",
+        }),
+      })
+
+      if (response.ok) {
+        showAlert("Worker assigned successfully", "success")
+        if (viewMode === "prioritized") {
+          fetchPrioritizedRequests()
+        } else {
+          fetchRequests()
+        }
+        setIsModalOpen(false)
+      } else {
+        showAlert("Failed to assign worker", "error")
+      }
+    } catch (error) {
+      console.error("Error assigning worker:", error)
+      showAlert("Error assigning worker", "error")
+    }
+  }
+
+  const showAlert = (message: string, severity: AlertState["severity"] = "success"): void => {
+    setAlert({ open: true, message, severity })
+    setTimeout(() => setAlert({ ...alert, open: false }), 3000)
+  }
+
   const prepareExportData = () => {
     return filteredRequests.map((request) => ({
       Title: request.title,
@@ -310,6 +395,18 @@ const AdminDashboard = () => {
       Rating: request.rating || "Not rated",
       Feedback: request.workerFeedback || "N/A",
     }))
+  }
+
+  const exportToExcel = (): void => {
+    const excelData = prepareExportData()
+    const worksheet = XLSX.utils.json_to_sheet(excelData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Requests")
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+    const data = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
+    })
+    saveAs(data, "requests.xlsx")
   }
 
   const getPriorityColor = (priority: string) => {
@@ -327,6 +424,25 @@ const AdminDashboard = () => {
     }
   }
 
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case "Completed":
+        return "bg-green-100 text-green-800"
+      case "In Progress":
+        return "bg-blue-100 text-blue-800"
+      case "Pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "Cancelled":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const indexOfLastRequest = page * rowsPerPage
+  const indexOfFirstRequest = indexOfLastRequest - rowsPerPage
+  const currentRequests = filteredRequests.slice(indexOfFirstRequest, indexOfLastRequest)
+
   return (
     <>
       <Header />
@@ -336,6 +452,23 @@ const AdminDashboard = () => {
           <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           <p className="text-gray-600">Manage all maintenance requests</p>
         </div>
+
+        {/* Alert */}
+        {alert.open && (
+          <div
+            className={`mb-4 p-4 rounded-md ${
+              alert.severity === "success"
+                ? "bg-green-50 text-green-800"
+                : alert.severity === "error"
+                  ? "bg-red-50 text-red-800"
+                  : alert.severity === "warning"
+                    ? "bg-yellow-50 text-yellow-800"
+                    : "bg-blue-50 text-blue-800"
+            }`}
+          >
+            {alert.message}
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -368,96 +501,6 @@ const AdminDashboard = () => {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Worker Performance Stats */}
-        <div className="bg-white p-6 rounded-lg shadow mb-8">
-          <h3 className="font-bold text-xl mb-4">Worker Performance</h3>
-
-          {workerStats.length === 0 ? (
-            <p className="text-gray-500">No worker performance data available.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Worker
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Role
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Performance Score
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Avg. Rating
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Avg. Resolution Time
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Current Workload
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {workerStats.map((worker) => (
-                    <tr key={worker._id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{worker.name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{worker.role}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div
-                              className="bg-blue-600 h-2.5 rounded-full"
-                              style={{ width: `${Math.min(worker.performanceScore * 20, 100)}%` }}
-                            ></div>
-                          </div>
-                          <span className="ml-2 text-sm text-gray-700">{worker.performanceScore.toFixed(1)}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {worker.averageRating ? worker.averageRating.toFixed(1) : "N/A"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {worker.averageResolutionTime ? `${worker.averageResolutionTime.toFixed(1)} hrs` : "N/A"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{worker.workload.inProgress} in progress</div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
 
         {/* Analytics Dashboard */}
@@ -520,116 +563,196 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="mb-6 flex flex-wrap gap-4 justify-between">
-          <div className="flex flex-wrap gap-4">
-            <div>
-              <label htmlFor="viewMode" className="block text-sm font-medium mb-1">
-                View Mode:
-              </label>
-              <div className="flex rounded-md overflow-hidden border border-gray-300">
-                <button
-                  onClick={() => handleViewModeChange("standard")}
-                  className={`px-4 py-1.5 ${
-                    viewMode === "standard" ? "bg-black text-white" : "bg-white text-gray-700"
-                  }`}
-                >
-                  Standard
-                </button>
-                <button
-                  onClick={() => handleViewModeChange("prioritized")}
-                  className={`px-4 py-1.5 ${
-                    viewMode === "prioritized" ? "bg-black text-white" : "bg-white text-gray-700"
-                  }`}
-                >
-                  Prioritized
-                </button>
+        {/* Worker Performance Stats */}
+        <div className="bg-white p-6 rounded-lg shadow mb-8">
+          <h3 className="font-bold text-xl mb-4">Worker Performance</h3>
+
+          {workerStats.length === 0 ? (
+            <p className="text-gray-500">No worker performance data available.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Worker
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Role
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Performance Score
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Avg. Rating
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Avg. Resolution Time
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Current Workload
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {workerStats.map((worker) => (
+                    <tr key={worker._id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{worker.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">{worker.role}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div
+                              className="bg-blue-600 h-2.5 rounded-full"
+                              style={{ width: `${Math.min(worker.performanceScore * 20, 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className="ml-2 text-sm text-gray-700">{worker.performanceScore.toFixed(1)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {worker.averageRating ? worker.averageRating.toFixed(1) : "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {worker.averageResolutionTime ? `${worker.averageResolutionTime.toFixed(1)} hrs` : "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{worker.workload.inProgress} in progress</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Filters and Controls */}
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-wrap gap-4 justify-between">
+            <div className="flex flex-wrap gap-4">
+              <div>
+                <label htmlFor="viewMode" className="block text-sm font-medium mb-1">
+                  View Mode:
+                </label>
+                <div className="flex rounded-md overflow-hidden border border-gray-300">
+                  <button
+                    onClick={() => handleViewModeChange("standard")}
+                    className={`px-4 py-1.5 ${
+                      viewMode === "standard" ? "bg-black text-white" : "bg-white text-gray-700"
+                    }`}
+                  >
+                    Standard
+                  </button>
+                  <button
+                    onClick={() => handleViewModeChange("prioritized")}
+                    className={`px-4 py-1.5 ${
+                      viewMode === "prioritized" ? "bg-black text-white" : "bg-white text-gray-700"
+                    }`}
+                  >
+                    Prioritized
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="displayMode" className="block text-sm font-medium mb-1">
+                  Display Mode:
+                </label>
+                <div className="flex rounded-md overflow-hidden border border-gray-300">
+                  <button
+                    onClick={() => setDisplayMode("cards")}
+                    className={`px-4 py-1.5 ${
+                      displayMode === "cards" ? "bg-blue-600 text-white" : "bg-white text-gray-700"
+                    }`}
+                  >
+                    Cards
+                  </button>
+                  <button
+                    onClick={() => setDisplayMode("table")}
+                    className={`px-4 py-1.5 ${
+                      displayMode === "table" ? "bg-blue-600 text-white" : "bg-white text-gray-700"
+                    }`}
+                  >
+                    Table
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div>
-              <label htmlFor="statusFilter" className="block text-sm font-medium mb-1">
-                Filter by status:
-              </label>
-              <select
-                id="statusFilter"
-                value={statusFilter}
-                onChange={handleStatusFilterChange}
-                className="border border-gray-300 rounded-md px-3 py-1.5"
+            <div className="flex gap-2">
+              <CSVLink
+                data={prepareExportData()}
+                filename={"maintenance-requests.csv"}
+                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 inline-flex items-center gap-2"
               >
-                <option value="">All Statuses</option>
-                <option value="Pending">Pending</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="categoryFilter" className="block text-sm font-medium mb-1">
-                Filter by category:
-              </label>
-              <select
-                id="categoryFilter"
-                value={categoryFilter}
-                onChange={handleCategoryFilterChange}
-                className="border border-gray-300 rounded-md px-3 py-1.5"
-              >
-                <option value="">All Categories</option>
-                <option value="Electrical">Electrical</option>
-                <option value="Plumbing">Plumbing</option>
-                <option value="Carpenter">Carpenter</option>
-                <option value="HVAC">HVAC</option>
-                <option value="Furniture">Furniture</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="priorityFilter" className="block text-sm font-medium mb-1">
-                Filter by priority:
-              </label>
-              <select
-                id="priorityFilter"
-                value={priorityFilter}
-                onChange={handlePriorityFilterChange}
-                className="border border-gray-300 rounded-md px-3 py-1.5"
-              >
-                <option value="">All Priorities</option>
-                <option value="Critical">Critical</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
+                Export to CSV
+              </CSVLink>
+              <button onClick={exportToExcel} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                Export to Excel
+              </button>
             </div>
           </div>
 
-          <div className="self-end">
-            <CSVLink
-              data={prepareExportData()}
-              filename={"maintenance-requests.csv"}
-              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 inline-flex items-center gap-2"
+          <div className="flex flex-wrap gap-4">
+            <input
+              type="text"
+              placeholder="Search requests..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              Export to CSV
-            </CSVLink>
+              <option value="">All Statuses</option>
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Categories</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Priorities</option>
+              {priorities.map((priority) => (
+                <option key={priority} value={priority}>
+                  {priority}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Requests List */}
+        {/* Requests Display */}
         {isLoading ? (
           <div className="text-center py-8">
             <p>Loading maintenance requests...</p>
@@ -642,7 +765,140 @@ const AdminDashboard = () => {
           <div className="text-center py-8 bg-gray-50 rounded-lg">
             <p className="text-gray-500">No maintenance requests found matching your filters.</p>
           </div>
+        ) : displayMode === "table" ? (
+          /* Table View */
+          <div className="bg-white shadow-md rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Title
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Location
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Priority
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Student
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Assigned To
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {currentRequests.map((request) => (
+                    <tr key={request._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{request.title}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{request.category}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{request.location}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(request.status)}`}
+                        >
+                          {request.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(request.priority)}`}
+                        >
+                          {request.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{request.studentRegNumber}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {request.assignedTo ? (
+                          <div className="text-sm text-gray-900">
+                            {request.assignedTo.name} ({request.assignedTo.role})
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-500">Not assigned</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onClick={() => openRequestModal(request)} className="text-blue-600 hover:text-blue-900">
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page === 1}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage(Math.min(Math.ceil(filteredRequests.length / rowsPerPage), page + 1))}
+                  disabled={page >= Math.ceil(filteredRequests.length / rowsPerPage)}
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{indexOfFirstRequest + 1}</span> to{" "}
+                    <span className="font-medium">{Math.min(indexOfLastRequest, filteredRequests.length)}</span> of{" "}
+                    <span className="font-medium">{filteredRequests.length}</span> results
+                  </p>
+                </div>
+                <div>
+                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button
+                      onClick={() => setPage(Math.max(1, page - 1))}
+                      disabled={page === 1}
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
+                      {page}
+                    </span>
+                    <button
+                      onClick={() => setPage(Math.min(Math.ceil(filteredRequests.length / rowsPerPage), page + 1))}
+                      disabled={page >= Math.ceil(filteredRequests.length / rowsPerPage)}
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
+          /* Card View */
           <div className="grid gap-6">
             {filteredRequests.map((request) => (
               <div
@@ -663,15 +919,7 @@ const AdminDashboard = () => {
                     >
                       {request.priority || "Medium"}
                     </span>
-                    <span
-                      className={`px-3 py-1 text-sm rounded-full ${
-                        request.status === "Completed"
-                          ? "bg-green-100 text-green-800"
-                          : request.status === "In Progress"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
+                    <span className={`px-3 py-1 text-sm rounded-full ${getStatusColor(request.status)}`}>
                       {request.status}
                     </span>
                   </div>
@@ -709,223 +957,159 @@ const AdminDashboard = () => {
 
       {/* Request Detail Modal */}
       {isModalOpen && selectedRequest && (
-        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start mb-4">
                 <h2 className="text-xl font-bold">{selectedRequest.title}</h2>
                 <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
 
-              <div className="mt-4 space-y-4">
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-500">Status</p>
-                    <p
-                      className={`inline-block px-3 py-1 text-sm rounded-full mt-1 ${
-                        selectedRequest.status === "Completed"
-                          ? "bg-green-100 text-green-800"
-                          : selectedRequest.status === "In Progress"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
-                      }`}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Status</label>
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 ${getStatusColor(selectedRequest.status)}`}
                     >
                       {selectedRequest.status}
-                    </p>
+                    </span>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-500">Priority</p>
-                    <p
-                      className={`inline-block px-3 py-1 text-sm rounded-full mt-1 ${getPriorityColor(
-                        selectedRequest.priority || "Medium",
-                      )}`}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Priority</label>
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 ${getPriorityColor(selectedRequest.priority || "Medium")}`}
                     >
                       {selectedRequest.priority || "Medium"}
-                    </p>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Category</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedRequest.category}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Location</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedRequest.location}</p>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Student</p>
-                  <p>{selectedRequest.studentRegNumber}</p>
+                  <label className="block text-sm font-medium text-gray-700">Student Registration Number</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedRequest.studentRegNumber}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Category</p>
-                  <p>{selectedRequest.category}</p>
+                  <label className="block text-sm font-medium text-gray-700">Description</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedRequest.description}</p>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Location</p>
-                  <p>{selectedRequest.location}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Description</p>
-                  <p>{selectedRequest.description}</p>
-                </div>
-
-                {selectedRequest.imageUrl && (
+                {/* Image Display */}
+                {(selectedRequest.imageData || selectedRequest.imageUrl) && (
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Image</p>
-                    <img
-                      src={`http://localhost:3001${selectedRequest.imageUrl}`}
-                      alt="Request"
-                      className="mt-2 max-h-60 rounded-md"
-                    />
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Image</label>
+                    {selectedRequest.imageData ? (
+                      <RequestImage requestId={selectedRequest._id} requestTitle={selectedRequest.title} />
+                    ) : selectedRequest.imageUrl ? (
+                      <img
+                        src={`http://localhost:3001${selectedRequest.imageUrl}`}
+                        alt="Request"
+                        className="max-h-60 rounded-md"
+                      />
+                    ) : null}
                   </div>
                 )}
 
                 {selectedRequest.workerFeedback && (
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Worker Feedback</p>
-                    <p className="bg-gray-50 p-2 rounded mt-1">{selectedRequest.workerFeedback}</p>
+                    <label className="block text-sm font-medium text-gray-700">Worker Feedback</label>
+                    <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                      {selectedRequest.workerFeedback}
+                    </p>
+                  </div>
+                )}
+
+                {selectedRequest.rating && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Rating</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedRequest.rating}/5 stars</p>
                   </div>
                 )}
 
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Update Priority</p>
+                  <label className="block text-sm font-medium text-gray-700">Update Priority</label>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => handleUpdatePriority("Critical")}
-                      disabled={isAssigning || selectedRequest.priority === "Critical"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.priority === "Critical"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-red-100 text-red-700 hover:bg-red-200"
-                      }`}
-                    >
-                      Critical
-                    </button>
-                    <button
-                      onClick={() => handleUpdatePriority("High")}
-                      disabled={isAssigning || selectedRequest.priority === "High"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.priority === "High"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-orange-100 text-orange-700 hover:bg-orange-200"
-                      }`}
-                    >
-                      High
-                    </button>
-                    <button
-                      onClick={() => handleUpdatePriority("Medium")}
-                      disabled={isAssigning || selectedRequest.priority === "Medium"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.priority === "Medium"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                      }`}
-                    >
-                      Medium
-                    </button>
-                    <button
-                      onClick={() => handleUpdatePriority("Low")}
-                      disabled={isAssigning || selectedRequest.priority === "Low"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.priority === "Low"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-green-100 text-green-700 hover:bg-green-200"
-                      }`}
-                    >
-                      Low
-                    </button>
+                    {priorities.map((priority) => (
+                      <button
+                        key={priority}
+                        onClick={() => handleUpdatePriority(priority)}
+                        disabled={isAssigning || selectedRequest.priority === priority}
+                        className={`px-3 py-1.5 rounded-md ${
+                          selectedRequest.priority === priority
+                            ? "bg-gray-200 text-gray-700"
+                            : `${getPriorityColor(priority)} hover:opacity-80`
+                        }`}
+                      >
+                        {priority}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Reassign Category</p>
+                  <label className="block text-sm font-medium text-gray-700">Reassign Category</label>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => handleAssignCategory("Electrical")}
-                      disabled={isAssigning || selectedRequest.category === "Electrical"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.category === "Electrical"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                      }`}
-                    >
-                      Electrical
-                    </button>
-                    <button
-                      onClick={() => handleAssignCategory("Plumbing")}
-                      disabled={isAssigning || selectedRequest.category === "Plumbing"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.category === "Plumbing"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                      }`}
-                    >
-                      Plumbing
-                    </button>
-                    <button
-                      onClick={() => handleAssignCategory("Carpenter")}
-                      disabled={isAssigning || selectedRequest.category === "Carpenter"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.category === "Carpenter"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                      }`}
-                    >
-                      Carpenter
-                    </button>
-                    <button
-                      onClick={() => handleAssignCategory("HVAC")}
-                      disabled={isAssigning || selectedRequest.category === "HVAC"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.category === "HVAC"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                      }`}
-                    >
-                      HVAC
-                    </button>
-                    <button
-                      onClick={() => handleAssignCategory("Furniture")}
-                      disabled={isAssigning || selectedRequest.category === "Furniture"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.category === "Furniture"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                      }`}
-                    >
-                      Furniture
-                    </button>
-                    <button
-                      onClick={() => handleAssignCategory("Other")}
-                      disabled={isAssigning || selectedRequest.category === "Other"}
-                      className={`px-3 py-1.5 rounded-md ${
-                        selectedRequest.category === "Other"
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                      }`}
-                    >
-                      Other
-                    </button>
+                    {categories.map((category) => (
+                      <button
+                        key={category}
+                        onClick={() => handleAssignCategory(category)}
+                        disabled={isAssigning || selectedRequest.category === category}
+                        className={`px-3 py-1.5 rounded-md ${
+                          selectedRequest.category === category
+                            ? "bg-gray-200 text-gray-700"
+                            : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                        }`}
+                      >
+                        {category}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="pt-4 border-t flex justify-end">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Assign Worker</label>
+                  <select
+                    value={selectedWorker}
+                    onChange={(e) => setSelectedWorker(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select a worker</option>
+                    {workers.map((worker) => (
+                      <option key={worker._id} value={worker._id}>
+                        {worker.name} ({worker.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4 border-t">
                   <button
                     onClick={() => setIsModalOpen(false)}
-                    className="border border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50"
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
                     Close
+                  </button>
+                  <button
+                    onClick={handleAssignWorker}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Assign Worker
                   </button>
                 </div>
               </div>

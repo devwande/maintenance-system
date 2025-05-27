@@ -8,6 +8,7 @@ import axios from "axios"
 import { toast } from "react-hot-toast"
 import Header from "@/components/Header"
 import AvailableRequests from "./components/AvailableRequests"
+import RequestImage from "@/components/RequestImage"
 
 interface MaintenanceRequest {
   _id: string
@@ -20,7 +21,8 @@ interface MaintenanceRequest {
   priorityScore?: number
   createdAt: string
   studentRegNumber: string
-  imageUrl?: string
+  imageData?: string
+  imageContentType?: string
   workerFeedback?: string
   rating?: number
   assignedAt?: string
@@ -62,7 +64,7 @@ const WorkerDashboard = () => {
         }
         setWorkerRole(parsedData.role)
         setWorkerId(parsedData.id)
-        fetchRequests(parsedData.id) // Pass workerId instead of role
+        fetchRequests(parsedData.id)
         fetchWorkerStats(parsedData.id)
       } catch (error) {
         console.error("Error parsing user data:", error)
@@ -98,7 +100,6 @@ const WorkerDashboard = () => {
     setError(null)
 
     try {
-      // Map worker roles to request categories
       const roleToCategory: Record<string, string> = {
         Electrician: "Electrical",
         Plumber: "Plumbing",
@@ -106,7 +107,6 @@ const WorkerDashboard = () => {
         Other: "Other",
       }
 
-      // Use the mapped category or the original role if no mapping exists
       const category = roleToCategory[role as keyof typeof roleToCategory] || role
 
       let url = "http://localhost:3001/api/admin/prioritized-requests"
@@ -154,7 +154,7 @@ const WorkerDashboard = () => {
     if (viewMode === "prioritized") {
       fetchPrioritizedRequests(workerRole, status)
     } else {
-      fetchRequests(workerId, status) // Use workerId instead of workerRole
+      fetchRequests(workerId, status)
     }
   }
 
@@ -163,7 +163,7 @@ const WorkerDashboard = () => {
     if (mode === "prioritized") {
       fetchPrioritizedRequests(workerRole, statusFilter)
     } else {
-      fetchRequests(workerId, statusFilter) // Use workerId instead of workerRole
+      fetchRequests(workerId, statusFilter)
     }
   }
 
@@ -180,12 +180,10 @@ const WorkerDashboard = () => {
       if (response.status === 200) {
         toast.success("Feedback saved successfully")
 
-        // Update the request in the local state
         setRequests(
           requests.map((req) => (req._id === selectedRequest._id ? { ...req, workerFeedback: feedback } : req)),
         )
 
-        // Update selected request
         setSelectedRequest({ ...selectedRequest, workerFeedback: feedback })
       }
     } catch (error) {
@@ -208,12 +206,10 @@ const WorkerDashboard = () => {
         toast.success("Feedback deleted successfully")
         setFeedback("")
 
-        // Update the request in the local state
         setRequests(
           requests.map((req) => (req._id === selectedRequest._id ? { ...req, workerFeedback: undefined } : req)),
         )
 
-        // Update selected request
         setSelectedRequest({ ...selectedRequest, workerFeedback: undefined })
       }
     } catch (error) {
@@ -234,7 +230,6 @@ const WorkerDashboard = () => {
         status: newStatus,
       }
 
-      // Only include feedback if it exists
       if (selectedRequest.workerFeedback) {
         payload.workerFeedback = selectedRequest.workerFeedback
       }
@@ -249,10 +244,9 @@ const WorkerDashboard = () => {
         if (viewMode === "prioritized") {
           fetchPrioritizedRequests(workerRole, statusFilter)
         } else {
-          fetchRequests(workerId, statusFilter) // Use workerId instead of workerRole
+          fetchRequests(workerId, statusFilter)
         }
 
-        // Refresh worker stats if a task was completed
         if (newStatus === "Completed") {
           fetchWorkerStats(workerId)
         }
@@ -457,6 +451,14 @@ const WorkerDashboard = () => {
                     </div>
                   </div>
                   <p className="mt-2">{request.description}</p>
+
+                  {/* Image Display */}
+                  {request.imageData && (
+                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                      <RequestImage requestId={request._id} requestTitle={request.title} className="inline-block" />
+                    </div>
+                  )}
+
                   {request.workerFeedback && (
                     <div className="mt-2 bg-gray-50 p-2 rounded">
                       <p className="text-sm font-medium">Your feedback:</p>
@@ -551,19 +553,11 @@ const WorkerDashboard = () => {
                   <p>{selectedRequest.description}</p>
                 </div>
 
-                {selectedRequest.imageUrl && (
+                {selectedRequest.imageData && (
                   <div>
                     <p className="text-sm font-medium text-gray-500">Image</p>
                     <div className="mt-2">
-                      <img
-                        src={`http://localhost:3001${selectedRequest.imageUrl}`}
-                        alt="Request"
-                        className="max-h-60 w-auto rounded-md shadow-sm border border-gray-200 object-cover"
-                        onError={(e) => {
-                          console.error("Image failed to load:", selectedRequest.imageUrl)
-                          e.currentTarget.style.display = "none"
-                        }}
-                      />
+                      <RequestImage requestId={selectedRequest._id} requestTitle={selectedRequest.title} />
                     </div>
                   </div>
                 )}

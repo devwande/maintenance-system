@@ -272,7 +272,6 @@ const StudentDashboard = () => {
                   <option value="Electrical">Electrical</option>
                   <option value="Carpenter">Carpenter</option>
                   <option value="Plumbing">Plumbing</option>
-                  <option value="HVAC">HVAC</option>
                   <option value="Other">Other</option>
                 </select>
               </div>

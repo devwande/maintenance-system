@@ -90,7 +90,6 @@ export const getAvailableRequests = async (req, res) => {
       Electrician: "Electrical",
       Plumber: "Plumbing",
       Carpenter: "Carpenter",
-      HVAC: "HVAC",
       Other: "Other",
     }
 

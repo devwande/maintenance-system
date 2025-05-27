@@ -98,7 +98,6 @@ router.get("/requests/:role", async (req, res) => {
       Electrician: "Electrical",
       Plumber: "Plumbing",
       Carpenter: "Carpentry",
-      HVAC: "HVAC",
       // Add other mappings as needed
     }
 

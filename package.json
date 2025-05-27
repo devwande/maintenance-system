@@ -11,10 +11,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.1.0",
+    "@mui/material": "^7.1.0",
     "@radix-ui/react-slot": "^1.2.0",
     "@radix-ui/themes": "^3.2.1",
     "@tailwindcss/vite": "^4.1.3",
     "@tanstack/react-query": "^5.74.4",
+    "@types/file-saver": "^2.0.7",
     "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
@@ -24,6 +29,7 @@
     "dotenv": "^16.5.0",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
+    "file-saver": "^2.0.5",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.488.0",
     "mongoose": "^8.13.2",
@@ -38,7 +44,8 @@
     "react-toastify": "^11.0.5",
     "recharts": "^2.15.3",
     "tailwind-merge": "^3.2.0",
-    "tailwindcss": "^4.1.3"
+    "tailwindcss": "^4.1.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
