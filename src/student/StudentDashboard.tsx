@@ -3,8 +3,9 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
-import { PlusIcon, X, Bell, Star } from "lucide-react"
+import { PlusIcon, X, Star } from "lucide-react"
 import Header from "./components/header"
+import NotificationCenter from "./components/NotificationCenter"
 import axios from "axios"
 
 interface FormData {
@@ -25,7 +26,8 @@ interface MaintenanceRequest {
   status: string
   priority: string
   createdAt: string
-  imageUrl?: string
+  imageData?: string
+  imageContentType?: string
   workerFeedback?: string
   rating?: number
 }
@@ -45,15 +47,12 @@ const StudentDashboard = () => {
   const [studentRegNumber, setStudentRegNumber] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [notifications, setNotifications] = useState<{ id: string; message: string; read: boolean }[]>([])
-  const [showNotifications, setShowNotifications] = useState(false)
   const [ratingModalOpen, setRatingModalOpen] = useState(false)
   const [selectedRequestForRating, setSelectedRequestForRating] = useState<MaintenanceRequest | null>(null)
   const [currentRating, setCurrentRating] = useState<number>(0)
   const [isRatingSubmitting, setIsRatingSubmitting] = useState(false)
 
   useEffect(() => {
-    // Get student data from localStorage
     const userData = localStorage.getItem("user")
     if (userData) {
       try {
@@ -70,38 +69,14 @@ const StudentDashboard = () => {
     }
   }, [])
 
-  useEffect(() => {
-    // Simulate notifications based on request status changes
-    // In a real app, this would come from a backend notification system
-    if (requests.length > 0) {
-      const newNotifications = requests
-        .filter((req) => req.status === "In Progress" || req.status === "Completed")
-        .map((req) => ({
-          id: req._id,
-          message:
-            req.status === "In Progress"
-              ? `Your request "${req.title}" is now being worked on.`
-              : `Your request "${req.title}" has been completed.`,
-          read: false,
-        }))
-
-      setNotifications(newNotifications)
-    }
-  }, [requests])
-
-  const markAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, read: true })))
-  }
-
   const fetchRequests = async (regNumber: string) => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await axios.get(`http://localhost:3001/api/requests/${regNumber}`)
+      const response = await axios.get(`http://localhost:3001/api/requests/student/${regNumber}`)
       const data = response.data
 
-      // Make sure data is an array
       if (Array.isArray(data)) {
         setRequests(data)
       } else {
@@ -142,7 +117,6 @@ const StudentDashboard = () => {
     setIsSubmitting(true)
 
     try {
-      // Create FormData object for file upload
       const formDataToSend = new FormData()
       formDataToSend.append("title", formData.title)
       formDataToSend.append("category", formData.category)
@@ -155,25 +129,19 @@ const StudentDashboard = () => {
         formDataToSend.append("image", formData.image)
       }
 
-      // Submit to backend
       await axios.post(`http://localhost:3001/api/requests`, formDataToSend, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       })
 
-      // Small delay for better UX (optional)
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      // Close modal and reset
       setIsModalOpen(false)
       resetForm()
-
-      // Refresh requests list
       fetchRequests(studentRegNumber)
     } catch (error) {
       console.error("Error submitting form:", error)
-      // Optionally show error to user
       setError("Failed to submit request. Please try again.")
     } finally {
       setIsSubmitting(false)
@@ -201,7 +169,6 @@ const StudentDashboard = () => {
       })
 
       if (response.data.success) {
-        // Update the request in the local state
         setRequests(
           requests.map((req) => (req._id === selectedRequestForRating._id ? { ...req, rating: currentRating } : req)),
         )
@@ -235,46 +202,13 @@ const StudentDashboard = () => {
     <>
       <main className="mx-auto md:max-w-full xl:max-w-[1440px] space-y-10">
         <Header />
-        <div className="relative ml-auto mr-4 mt-4">
-          <button
-            className="relative p-2 rounded-full hover:bg-gray-200"
-            onClick={() => setShowNotifications(!showNotifications)}
-          >
-            <Bell size={24} />
-            {notifications.some((n) => !n.read) && (
-              <span className="absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full"></span>
-            )}
-          </button>
 
-          {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-              <div className="flex justify-between items-center p-3 border-b">
-                <h3 className="font-medium">Notifications</h3>
-                {notifications.some((n) => !n.read) && (
-                  <button onClick={markAllAsRead} className="text-xs text-blue-600 hover:text-blue-800">
-                    Mark all as read
-                  </button>
-                )}
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {notifications.length === 0 ? (
-                  <p className="p-4 text-center text-gray-500">No notifications</p>
-                ) : (
-                  notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-3 border-b ${notification.read ? "bg-white" : "bg-blue-50"}`}
-                    >
-                      <p className="text-sm">{notification.message}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+        {/* Notification Center */}
+        <div className="relative ml-auto mr-4 mt-4 flex justify-end">
+          <NotificationCenter requests={requests} />
         </div>
 
-        <section className="px-4 md:px-24">
+        <section className="px-4">
           <div className="flex justify-between">
             <div>
               <h1 className="text-2xl font-bold">Student Maintenance Requests</h1>
@@ -294,7 +228,7 @@ const StudentDashboard = () => {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0  bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-2xl">
             <div className="flex justify-between items-center border-b p-4">
               <h2 className="text-xl font-bold">Submit a Maintenance Request</h2>
@@ -302,7 +236,7 @@ const StudentDashboard = () => {
                 type="button"
                 onClick={() => {
                   setIsModalOpen(false)
-                  resetForm() // Reset form when closing modal
+                  resetForm()
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -424,7 +358,7 @@ const StudentDashboard = () => {
         </div>
       )}
 
-      <section className="px-4 md:px-24 mt-8">
+      <section className="mx-auto md:max-w-full xl:max-w-[1440px] px-4 mt-8">
         {isLoading ? (
           <div className="text-center py-8">
             <p>Loading your maintenance requests...</p>
@@ -468,14 +402,14 @@ const StudentDashboard = () => {
                   </div>
                 </div>
                 <p className="mt-2 text-sm">{request.description}</p>
-                {request.imageUrl && (
+                {request.imageData && (
                   <div className="mt-2">
                     <img
-                      src={`http://localhost:3001${request.imageUrl}`}
+                      src={`http://localhost:3001/api/requests/image/${request._id}`}
                       alt="Request"
                       className="max-h-40 w-auto rounded-md object-cover shadow-sm border border-gray-200"
                       onError={(e) => {
-                        console.error("Image failed to load:", request.imageUrl)
+                        console.error("Image failed to load:", request._id)
                         e.currentTarget.style.display = "none"
                       }}
                     />

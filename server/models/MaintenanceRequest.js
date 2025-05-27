@@ -5,7 +5,8 @@ const MaintenanceRequestSchema = new mongoose.Schema({
   category: { type: String, required: true },
   location: { type: String, required: true },
   description: { type: String, required: true },
-  imageUrl: { type: String }, // Will store the path to uploaded image
+  imageData: { type: String }, // Base64 encoded image data
+  imageContentType: { type: String }, // MIME type (image/jpeg, image/png, etc.)
   status: { type: String, default: "Pending", enum: ["Pending", "In Progress", "Completed"] },
   studentRegNumber: { type: String, required: true },
   workerFeedback: { type: String },
