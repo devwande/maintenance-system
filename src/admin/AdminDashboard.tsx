@@ -671,7 +671,7 @@ const AdminDashboard = () => {
                   <button
                     onClick={() => setDisplayMode("cards")}
                     className={`px-4 py-1.5 ${
-                      displayMode === "cards" ? "bg-blue-600 text-white" : "bg-white text-gray-700"
+                      displayMode === "cards" ? "bg-black text-white" : "bg-white text-gray-700"
                     }`}
                   >
                     Cards
@@ -679,7 +679,7 @@ const AdminDashboard = () => {
                   <button
                     onClick={() => setDisplayMode("table")}
                     className={`px-4 py-1.5 ${
-                      displayMode === "table" ? "bg-blue-600 text-white" : "bg-white text-gray-700"
+                      displayMode === "table" ? "bg-black text-white" : "bg-white text-gray-700"
                     }`}
                   >
                     Table
@@ -957,7 +957,7 @@ const AdminDashboard = () => {
 
       {/* Request Detail Modal */}
       {isModalOpen && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0  bg-black/50  flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
