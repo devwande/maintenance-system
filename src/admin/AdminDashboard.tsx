@@ -120,6 +120,9 @@ const AdminDashboard = () => {
   const [page, setPage] = useState<number>(1)
   const [rowsPerPage] = useState<number>(10)
   const [alert, setAlert] = useState<AlertState>({ open: false, message: "", severity: "success" })
+  const [adminDormitory, setAdminDormitory] = useState<string>("")
+  const [exportMonth, setExportMonth] = useState<string>("")
+  const [exportHall, setExportHall] = useState<string>("")
 
   const navigate = useNavigate()
 
@@ -137,6 +140,7 @@ const AdminDashboard = () => {
           navigate("/")
           return
         }
+        setAdminDormitory(parsedData.dormitory || "")
         fetchRequests()
         fetchWorkerStats()
         fetchWorkers()
@@ -164,7 +168,14 @@ const AdminDashboard = () => {
 
     try {
       const response = await axios.get("http://localhost:3001/api/admin/requests")
-      setRequests(response.data)
+      let filteredData = response.data
+
+      // Filter by admin's dormitory if not general admin
+      if (adminDormitory && adminDormitory !== "General Admin") {
+        filteredData = response.data.filter((request: MaintenanceRequest) => request.location.includes(adminDormitory))
+      }
+
+      setRequests(filteredData)
     } catch (error) {
       console.error("Error fetching requests:", error)
       setError("Failed to load maintenance requests. Please try again later.")
@@ -443,6 +454,62 @@ const AdminDashboard = () => {
   const indexOfFirstRequest = indexOfLastRequest - rowsPerPage
   const currentRequests = filteredRequests.slice(indexOfFirstRequest, indexOfLastRequest)
 
+  const exportByHall = (hall: string): void => {
+    const hallRequests = filteredRequests.filter((request) => request.location.includes(hall))
+    const excelData = hallRequests.map((request) => ({
+      Title: request.title,
+      Category: request.category,
+      Location: request.location,
+      Description: request.description,
+      Status: request.status,
+      Priority: request.priority,
+      Student: request.studentRegNumber,
+      "Assigned To": request.assignedTo?.name || "Not assigned",
+      "Submitted On": new Date(request.createdAt).toLocaleDateString(),
+      Rating: request.rating || "Not rated",
+      Feedback: request.workerFeedback || "N/A",
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, `${hall} Requests`)
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+    const data = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
+    })
+    saveAs(data, `${hall.replace(" ", "_")}_requests.xlsx`)
+  }
+
+  const exportByMonth = (month: string): void => {
+    const monthRequests = filteredRequests.filter((request) => {
+      const requestMonth = new Date(request.createdAt).toISOString().slice(0, 7)
+      return requestMonth === month
+    })
+
+    const excelData = monthRequests.map((request) => ({
+      Title: request.title,
+      Category: request.category,
+      Location: request.location,
+      Description: request.description,
+      Status: request.status,
+      Priority: request.priority,
+      Student: request.studentRegNumber,
+      "Assigned To": request.assignedTo?.name || "Not assigned",
+      "Submitted On": new Date(request.createdAt).toLocaleDateString(),
+      Rating: request.rating || "Not rated",
+      Feedback: request.workerFeedback || "N/A",
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, `${month} Requests`)
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+    const data = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
+    })
+    saveAs(data, `${month}_requests.xlsx`)
+  }
+
   return (
     <>
       <Header />
@@ -688,7 +755,7 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <CSVLink
                 data={prepareExportData()}
                 filename={"maintenance-requests.csv"}
@@ -697,8 +764,51 @@ const AdminDashboard = () => {
                 Export to CSV
               </CSVLink>
               <button onClick={exportToExcel} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                Export to Excel
+                Export All to Excel
               </button>
+
+              <div className="flex gap-2 items-center">
+                <select
+                  value={exportHall}
+                  onChange={(e) => setExportHall(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="">Select Hall</option>
+                  <option value="Peter Hall">Peter Hall</option>
+                  <option value="Paul Hall">Paul Hall</option>
+                  <option value="John Hall">John Hall</option>
+                  <option value="Joseph Hall">Joseph Hall</option>
+                  <option value="Daniel Hall">Daniel Hall</option>
+                  <option value="Esther Hall">Esther Hall</option>
+                  <option value="Mary Hall">Mary Hall</option>
+                  <option value="Deborah Hall">Deborah Hall</option>
+                  <option value="Lydia Hall">Lydia Hall</option>
+                  <option value="Dorcas Hall">Dorcas Hall</option>
+                </select>
+                <button
+                  onClick={() => exportHall && exportByHall(exportHall)}
+                  disabled={!exportHall}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50"
+                >
+                  Export Hall
+                </button>
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <input
+                  type="month"
+                  value={exportMonth}
+                  onChange={(e) => setExportMonth(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+                <button
+                  onClick={() => exportMonth && exportByMonth(exportMonth)}
+                  disabled={!exportMonth}
+                  className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:opacity-50"
+                >
+                  Export Month
+                </button>
+              </div>
             </div>
           </div>
 

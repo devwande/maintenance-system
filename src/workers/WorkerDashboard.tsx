@@ -7,7 +7,6 @@ import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import { toast } from "react-hot-toast"
 import Header from "@/components/Header"
-import AvailableRequests from "./components/AvailableRequests"
 import RequestImage from "@/components/RequestImage"
 
 interface MaintenanceRequest {
@@ -48,8 +47,6 @@ const WorkerDashboard = () => {
   })
   const [isSavingFeedback, setIsSavingFeedback] = useState(false)
   const [isDeletingFeedback, setIsDeletingFeedback] = useState(false)
-  const [activeTab, setActiveTab] = useState<"assigned" | "available">("assigned")
-
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -280,10 +277,6 @@ const WorkerDashboard = () => {
     }
   }
 
-  const refreshAssignedRequests = () => {
-    fetchRequests(workerId, statusFilter)
-  }
-
   return (
     <>
       <Header />
@@ -331,69 +324,49 @@ const WorkerDashboard = () => {
           </div>
         </div>
 
+        {/* Remove the tab navigation entirely and just show assigned requests */}
         <div className="mb-6 flex flex-wrap justify-between items-center">
           <div className="flex flex-wrap gap-4 items-end">
-            {/* Tab Navigation */}
-            <div className="flex rounded-md overflow-hidden border border-gray-300">
-              <button
-                onClick={() => setActiveTab("assigned")}
-                className={`px-4 py-2 ${activeTab === "assigned" ? "bg-black text-white" : "bg-white text-gray-700"}`}
-              >
-                My Requests
-              </button>
-              <button
-                onClick={() => setActiveTab("available")}
-                className={`px-4 py-2 ${activeTab === "available" ? "bg-black text-white" : "bg-white text-gray-700"}`}
-              >
-                Available Requests
-              </button>
+            <div>
+              <label htmlFor="viewMode" className="block text-sm font-medium mb-1">
+                View Mode:
+              </label>
+              <div className="flex rounded-md overflow-hidden border border-gray-300">
+                <button
+                  onClick={() => handleViewModeChange("standard")}
+                  className={`px-4 py-1.5 ${
+                    viewMode === "standard" ? "bg-black text-white" : "bg-white text-gray-700"
+                  }`}
+                >
+                  Standard
+                </button>
+                <button
+                  onClick={() => handleViewModeChange("prioritized")}
+                  className={`px-4 py-1.5 ${
+                    viewMode === "prioritized" ? "bg-black text-white" : "bg-white text-gray-700"
+                  }`}
+                >
+                  Prioritized
+                </button>
+              </div>
             </div>
 
-            {/* Only show filters for assigned requests */}
-            {activeTab === "assigned" && (
-              <>
-                <div>
-                  <label htmlFor="viewMode" className="block text-sm font-medium mb-1">
-                    View Mode:
-                  </label>
-                  <div className="flex rounded-md overflow-hidden border border-gray-300">
-                    <button
-                      onClick={() => handleViewModeChange("standard")}
-                      className={`px-4 py-1.5 ${
-                        viewMode === "standard" ? "bg-black text-white" : "bg-white text-gray-700"
-                      }`}
-                    >
-                      Standard
-                    </button>
-                    <button
-                      onClick={() => handleViewModeChange("prioritized")}
-                      className={`px-4 py-1.5 ${
-                        viewMode === "prioritized" ? "bg-black text-white" : "bg-white text-gray-700"
-                      }`}
-                    >
-                      Prioritized
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="statusFilter" className="block text-sm font-medium mb-1">
-                    Filter by status:
-                  </label>
-                  <select
-                    id="statusFilter"
-                    value={statusFilter}
-                    onChange={handleStatusChange}
-                    className="border border-gray-300 rounded-md px-3 py-1.5"
-                  >
-                    <option value="">All Requests</option>
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                </div>
-              </>
-            )}
+            <div>
+              <label htmlFor="statusFilter" className="block text-sm font-medium mb-1">
+                Filter by status:
+              </label>
+              <select
+                id="statusFilter"
+                value={statusFilter}
+                onChange={handleStatusChange}
+                className="border border-gray-300 rounded-md px-3 py-1.5"
+              >
+                <option value="">All Requests</option>
+                <option value="Pending">Pending</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
           </div>
 
           <div className="bg-gray-100 px-4 py-2 rounded-md">
@@ -402,86 +375,81 @@ const WorkerDashboard = () => {
         </div>
 
         {/* Tab Content */}
-        {activeTab === "assigned" ? (
-          // Existing assigned requests content
-          isLoading ? (
-            <div className="text-center py-8">
-              <p>Loading maintenance requests...</p>
-            </div>
-          ) : error ? (
-            <div className="text-center py-8 text-red-500">
-              <p>{error}</p>
-            </div>
-          ) : requests.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">No maintenance requests assigned to you.</p>
-            </div>
-          ) : (
-            <div className="grid gap-6">
-              {requests.map((request) => (
-                <div
-                  key={request._id}
-                  className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => openRequestModal(request)}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-bold text-lg">{request.title}</h3>
-                      <p className="text-sm text-gray-600">
-                        {request.category} • {request.location} • Student: {request.studentRegNumber}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <span
-                        className={`px-3 py-1 text-sm rounded-full ${getPriorityColor(request.priority || "Medium")}`}
-                      >
-                        {request.priority || "Medium"}
-                      </span>
-                      <span
-                        className={`px-3 py-1 text-sm rounded-full ${
-                          request.status === "Completed"
-                            ? "bg-green-100 text-green-800"
-                            : request.status === "In Progress"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-yellow-100 text-yellow-800"
-                        }`}
-                      >
-                        {request.status}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="mt-2">{request.description}</p>
-
-                  {/* Image Display */}
-                  {request.imageData && (
-                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                      <RequestImage requestId={request._id} requestTitle={request.title} className="inline-block" />
-                    </div>
-                  )}
-
-                  {request.workerFeedback && (
-                    <div className="mt-2 bg-gray-50 p-2 rounded">
-                      <p className="text-sm font-medium">Your feedback:</p>
-                      <p className="text-sm">{request.workerFeedback}</p>
-                    </div>
-                  )}
-                  <div className="mt-2 flex justify-between">
-                    <p className="text-xs text-gray-500">
-                      Submitted on {new Date(request.createdAt).toLocaleDateString()}
+        {/* Existing assigned requests content */}
+        {isLoading ? (
+          <div className="text-center py-8">
+            <p>Loading maintenance requests...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-500">
+            <p>{error}</p>
+          </div>
+        ) : requests.length === 0 ? (
+          <div className="text-center py-8 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">No maintenance requests assigned to you.</p>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {requests.map((request) => (
+              <div
+                key={request._id}
+                className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => openRequestModal(request)}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-lg">{request.title}</h3>
+                    <p className="text-sm text-gray-600">
+                      {request.category} • {request.location} • Student: {request.studentRegNumber}
                     </p>
-                    {viewMode === "prioritized" && request.priorityScore && (
-                      <p className="text-xs font-medium bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                        Priority Score: {request.priorityScore.toFixed(1)}
-                      </p>
-                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <span
+                      className={`px-3 py-1 text-sm rounded-full ${getPriorityColor(request.priority || "Medium")}`}
+                    >
+                      {request.priority || "Medium"}
+                    </span>
+                    <span
+                      className={`px-3 py-1 text-sm rounded-full ${
+                        request.status === "Completed"
+                          ? "bg-green-100 text-green-800"
+                          : request.status === "In Progress"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {request.status}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          )
-        ) : (
-          // Available requests tab
-          <AvailableRequests workerRole={workerRole} workerId={workerId} onRequestClaimed={refreshAssignedRequests} />
+                <p className="mt-2">{request.description}</p>
+
+                {/* Image Display */}
+                {request.imageData && (
+                  <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                    <RequestImage requestId={request._id} requestTitle={request.title} className="inline-block" />
+                  </div>
+                )}
+
+                {request.workerFeedback && (
+                  <div className="mt-2 bg-gray-50 p-2 rounded">
+                    <p className="text-sm font-medium">Your feedback:</p>
+                    <p className="text-sm">{request.workerFeedback}</p>
+                  </div>
+                )}
+                <div className="mt-2 flex justify-between">
+                  <p className="text-xs text-gray-500">
+                    Submitted on {new Date(request.createdAt).toLocaleDateString()}
+                  </p>
+                  {viewMode === "prioritized" && request.priorityScore && (
+                    <p className="text-xs font-medium bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                      Priority Score: {request.priorityScore.toFixed(1)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </main>
 

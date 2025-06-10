@@ -36,7 +36,7 @@ const ImageModal = ({ isOpen, onClose, imageUrl, alt, title }: ImageModalProps) 
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 bg-opacity-75 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
     >
       <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex flex-col">

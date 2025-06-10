@@ -210,7 +210,17 @@ export const getRequestImage = async (req, res) => {
     }
 
     const imageBuffer = Buffer.from(request.imageData, "base64")
-    res.set("Content-Type", request.imageContentType)
+
+    // Set proper headers for image serving
+    res.set({
+      "Content-Type": request.imageContentType,
+      "Content-Length": imageBuffer.length,
+      "Cache-Control": "public, max-age=86400", // Cache for 1 day
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET",
+      "Access-Control-Allow-Headers": "Content-Type",
+    })
+
     res.send(imageBuffer)
   } catch (error) {
     console.error("Error serving image:", error)

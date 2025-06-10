@@ -11,7 +11,8 @@ import axios from "axios"
 interface FormData {
   title: string
   category: string
-  location: string
+  hall: string
+  roomNumber: string
   description: string
   priority: string
   image: File | null
@@ -37,7 +38,8 @@ const StudentDashboard = () => {
   const [formData, setFormData] = useState<FormData>({
     title: "",
     category: "",
-    location: "",
+    hall: "",
+    roomNumber: "",
     description: "",
     priority: "Medium",
     image: null,
@@ -94,7 +96,8 @@ const StudentDashboard = () => {
     setFormData({
       title: "",
       category: "",
-      location: "",
+      hall: "",
+      roomNumber: "",
       description: "",
       priority: "Medium",
       image: null,
@@ -120,7 +123,7 @@ const StudentDashboard = () => {
       const formDataToSend = new FormData()
       formDataToSend.append("title", formData.title)
       formDataToSend.append("category", formData.category)
-      formDataToSend.append("location", formData.location)
+      formDataToSend.append("location", `${formData.hall} - Room ${formData.roomNumber}`)
       formDataToSend.append("description", formData.description)
       formDataToSend.append("priority", formData.priority)
       formDataToSend.append("studentRegNumber", studentRegNumber)
@@ -296,14 +299,37 @@ const StudentDashboard = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                <input
-                  type="text"
-                  name="location"
-                  value={formData.location}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hall</label>
+                <select
+                  name="hall"
+                  value={formData.hall}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded-md"
-                  placeholder="Building and room number"
+                  required
+                >
+                  <option value="">Select your hall</option>
+                  <option value="Peter Hall">Peter Hall</option>
+                  <option value="Paul Hall">Paul Hall</option>
+                  <option value="John Hall">John Hall</option>
+                  <option value="Joseph Hall">Joseph Hall</option>
+                  <option value="Daniel Hall">Daniel Hall</option>
+                  <option value="Esther Hall">Esther Hall</option>
+                  <option value="Mary Hall">Mary Hall</option>
+                  <option value="Deborah Hall">Deborah Hall</option>
+                  <option value="Lydia Hall">Lydia Hall</option>
+                  <option value="Dorcas Hall">Dorcas Hall</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
+                <input
+                  type="text"
+                  name="roomNumber"
+                  value={formData.roomNumber}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  placeholder="e.g. 101, A23, etc."
                   required
                 />
               </div>

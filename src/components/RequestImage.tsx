@@ -48,11 +48,12 @@ const RequestImage = ({ requestId, requestTitle, className = "", showZoomIcon = 
             setIsLoading(false)
             setHasError(true)
           }}
+          crossOrigin="anonymous"
         />
 
         {/* Zoom overlay */}
         {showZoomIcon && !isLoading && !hasError && (
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-md flex items-center justify-center">
+          <div className="absolute inset-0 bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-md flex items-center justify-center">
             <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
           </div>
         )}

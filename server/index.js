@@ -58,14 +58,22 @@ mongoose
 app.use("/", authRoutes)
 app.use("/api/requests", requestRoutes)
 
-// Admin routes
+// Admin routes with dormitory filtering
 app.get("/api/admin/requests", async (req, res) => {
   try {
-    const { status, category } = req.query
+    const { status, category, dormitory, month, year } = req.query
     const query = {}
 
     if (status) query.status = status
     if (category) query.category = category
+    if (dormitory && dormitory !== "All") query.dormitory = dormitory
+
+    // Filter by month and year if provided
+    if (month && year) {
+      const startDate = new Date(year, month - 1, 1)
+      const endDate = new Date(year, month, 0, 23, 59, 59)
+      query.createdAt = { $gte: startDate, $lte: endDate }
+    }
 
     const requests = await MaintenanceRequest.find(query).populate("assignedTo", "name role").sort({ createdAt: -1 })
     res.json(requests)
@@ -77,10 +85,11 @@ app.get("/api/admin/requests", async (req, res) => {
 
 app.get("/api/admin/prioritized-requests", async (req, res) => {
   try {
-    const { status, category } = req.query
+    const { status, category, dormitory } = req.query
     const filters = {}
     if (status) filters.status = status
     if (category) filters.category = category
+    if (dormitory && dormitory !== "All") filters.dormitory = dormitory
 
     const prioritizedRequests = await getPrioritizedRequests(filters)
     res.json(prioritizedRequests)
@@ -92,8 +101,33 @@ app.get("/api/admin/prioritized-requests", async (req, res) => {
 
 app.get("/api/admin/worker-statistics", async (req, res) => {
   try {
-    const workerStats = await getWorkerStatistics()
+    const { dormitory } = req.query
+    const workerStats = await getWorkerStatistics(dormitory)
     res.json(workerStats)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Export routes
+app.get("/api/admin/export", async (req, res) => {
+  try {
+    const { type, dormitory, month, year } = req.query
+    const query = {}
+
+    if (type === "hall" && dormitory && dormitory !== "All") {
+      query.dormitory = dormitory
+    } else if (type === "month" && month && year) {
+      const startDate = new Date(year, month - 1, 1)
+      const endDate = new Date(year, month, 0, 23, 59, 59)
+      query.createdAt = { $gte: startDate, $lte: endDate }
+    }
+    // For 'full' type, no additional filters needed
+
+    const requests = await MaintenanceRequest.find(query).populate("assignedTo", "name role").sort({ createdAt: -1 })
+
+    res.json(requests)
   } catch (error) {
     console.error(error)
     res.status(500).json({ error: error.message })
@@ -191,24 +225,54 @@ app.get("/api/test/worker-distribution", async (req, res) => {
   }
 })
 
-// Create initial admin
-const createInitialAdmin = async () => {
+// Create initial admins
+const createInitialAdmins = async () => {
   try {
-    const adminCount = await AdminModel.countDocuments()
-    if (adminCount === 0) {
+    const dormitories = [
+      "Peter Hall",
+      "Paul Hall",
+      "John Hall",
+      "Joseph Hall",
+      "Daniel Hall",
+      "Esther Hall",
+      "Mary Hall",
+      "Deborah Hall",
+      "Lydia Hall",
+      "Dorcas Hall",
+    ]
+
+    // Create general admin if it doesn't exist
+    const generalAdminExists = await AdminModel.findOne({ name: "admin" })
+    if (!generalAdminExists) {
       await AdminModel.create({
         name: "admin",
         password: "admin123",
       })
-      console.log("Initial admin account created")
+      console.log("General admin account created")
     }
+
+    // Create hall-specific admins
+    for (const hall of dormitories) {
+      const adminName = `${hall.toLowerCase().replace(" ", "_")}_admin`
+      const adminExists = await AdminModel.findOne({ name: adminName })
+
+      if (!adminExists) {
+        await AdminModel.create({
+          name: adminName,
+          password: "admin123",
+        })
+        console.log(`Admin account created for ${hall}: ${adminName}`)
+      }
+    }
+
+    console.log("All admin accounts initialized successfully")
   } catch (error) {
-    console.error("Error creating initial admin:", error)
+    console.error("Error creating initial admins:", error)
   }
 }
 
 mongoose.connection.once("open", () => {
-  createInitialAdmin()
+  createInitialAdmins()
 })
 
 app.listen(PORT, () => {

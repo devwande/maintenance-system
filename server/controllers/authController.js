@@ -43,6 +43,7 @@ export const studentLogin = async (req, res) => {
           regNumber: user.regNumber,
           email: user.email,
           dormitory: user.dormitory,
+          roomNumber: user.roomNumber,
           role: "student",
         },
       },
@@ -58,9 +59,9 @@ export const studentLogin = async (req, res) => {
 
 export const studentRegister = async (req, res) => {
   try {
-    const { name, regNumber, email, dormitory, password } = req.body
+    const { name, regNumber, email, dormitory, roomNumber, password } = req.body
 
-    if (!name || !regNumber || !email || !dormitory || !password) {
+    if (!name || !regNumber || !email || !dormitory || !roomNumber || !password) {
       return res.status(400).json({
         status: "fail",
         message: "All fields are required",
@@ -72,6 +73,7 @@ export const studentRegister = async (req, res) => {
       regNumber,
       email,
       dormitory,
+      roomNumber,
       password,
     })
 
@@ -81,7 +83,14 @@ export const studentRegister = async (req, res) => {
       status: "success",
       token,
       data: {
-        user: newStudent,
+        user: {
+          name: newStudent.name,
+          regNumber: newStudent.regNumber,
+          email: newStudent.email,
+          dormitory: newStudent.dormitory,
+          roomNumber: newStudent.roomNumber,
+          role: "student",
+        },
       },
     })
   } catch (error) {
@@ -196,7 +205,7 @@ export const workerRegister = async (req, res) => {
 
 export const adminLogin = async (req, res) => {
   try {
-    const { name, password } = req.body
+    const { name, dormitory, password } = req.body
 
     if (!name || !password) {
       return res.status(400).json({
@@ -205,7 +214,14 @@ export const adminLogin = async (req, res) => {
       })
     }
 
-    const admin = await AdminModel.findOne({ name }).select("+password")
+    let adminName = name
+
+    // If dormitory is selected and it's not "All", construct the admin name
+    if (dormitory && dormitory !== "All") {
+      adminName = `${dormitory.toLowerCase().replace(" ", "_")}_admin`
+    }
+
+    const admin = await AdminModel.findOne({ name: adminName }).select("+password")
 
     if (!admin || !(await admin.correctPassword(password, admin.password))) {
       return res.status(401).json({
@@ -223,6 +239,7 @@ export const adminLogin = async (req, res) => {
         user: {
           id: admin._id,
           name: admin.name,
+          dormitory: dormitory || null,
           userType: "admin",
         },
       },
