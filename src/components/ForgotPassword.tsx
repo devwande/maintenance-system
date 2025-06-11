@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import { toast } from "react-hot-toast"
 import { ArrowLeft, Mail, Lock, Eye, EyeOff } from "lucide-react"
@@ -21,7 +20,6 @@ const ForgotPassword = ({ userType, onBack }: ForgotPasswordProps) => {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
