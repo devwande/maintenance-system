@@ -167,7 +167,7 @@ const AdminDashboard = () => {
     setError(null)
 
     try {
-      const response = await axios.get("http://localhost:3001/api/admin/requests")
+      const response = await axios.get("https://maintenance-system-backend-production.up.railway.app/api/admin/requests")
       let filteredData = response.data
 
       // Filter by admin's dormitory if not general admin
@@ -189,7 +189,7 @@ const AdminDashboard = () => {
     setError(null)
 
     try {
-      let url = "http://localhost:3001/api/admin/prioritized-requests"
+      let url = "https://maintenance-system-backend-production.up.railway.app/api/admin/prioritized-requests"
       const params = new URLSearchParams()
 
       if (statusFilter) params.append("status", statusFilter)
@@ -212,7 +212,7 @@ const AdminDashboard = () => {
 
   const fetchWorkerStats = async () => {
     try {
-      const response = await axios.get("http://localhost:3001/api/admin/worker-statistics")
+      const response = await axios.get("https://maintenance-system-backend-production.up.railway.app/api/admin/worker-statistics")
       setWorkerStats(response.data)
     } catch (error) {
       console.error("Error fetching worker statistics:", error)
@@ -221,7 +221,7 @@ const AdminDashboard = () => {
 
   const fetchWorkers = async (): Promise<void> => {
     try {
-      const response = await fetch("http://localhost:3001/api/admin/worker-statistics")
+      const response = await fetch("https://maintenance-system-backend-production.up.railway.app/api/admin/worker-statistics")
       const data: Worker[] = await response.json()
       setWorkers(data)
     } catch (error) {
@@ -305,7 +305,7 @@ const AdminDashboard = () => {
     setIsAssigning(true)
 
     try {
-      const response = await axios.patch(`http://localhost:3001/api/admin/assign/${selectedRequest._id}`, {
+      const response = await axios.patch(`https://maintenance-system-backend-production.up.railway.app/api/admin/assign/${selectedRequest._id}`, {
         category: newCategory,
       })
 
@@ -333,7 +333,7 @@ const AdminDashboard = () => {
     setIsAssigning(true)
 
     try {
-      const response = await axios.patch(`http://localhost:3001/api/admin/priority/${selectedRequest._id}`, {
+      const response = await axios.patch(`https://maintenance-system-backend-production.up.railway.app/api/admin/priority/${selectedRequest._id}`, {
         priority: newPriority,
       })
 
@@ -358,7 +358,7 @@ const AdminDashboard = () => {
     if (!selectedRequest) return
 
     try {
-      const response = await fetch(`http://localhost:3001/api/requests/${selectedRequest._id}`, {
+      const response = await fetch(`https://maintenance-system-backend-production.up.railway.app/api/requests/${selectedRequest._id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -1128,7 +1128,7 @@ const AdminDashboard = () => {
                       <RequestImage requestId={selectedRequest._id} requestTitle={selectedRequest.title} />
                     ) : selectedRequest.imageUrl ? (
                       <img
-                        src={`http://localhost:3001${selectedRequest.imageUrl}`}
+                        src={`https://maintenance-system-backend-production.up.railway.app${selectedRequest.imageUrl}`}
                         alt="Request"
                         className="max-h-60 rounded-md"
                       />

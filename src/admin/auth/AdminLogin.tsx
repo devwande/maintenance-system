@@ -30,7 +30,7 @@ const AdminLogin = () => {
     }
 
     try {
-      const response = await axios.post(`http://localhost:3001/admin/login`, values)
+      const response = await axios.post(`https://maintenance-system-backend-production.up.railway.app/admin/login`, values)
 
       if (response.data.status === "success") {
         const userData = response.data.data.user

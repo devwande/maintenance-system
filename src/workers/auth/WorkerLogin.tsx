@@ -1,82 +1,96 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import axios from "axios"
-import { toast } from "react-hot-toast"
-import Logo from "../../assets/cu_logo.jpg"
-import ForgotPassword from "../../components/ForgotPassword"
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "react-hot-toast";
+import Logo from "../../assets/cu_logo.jpg";
+import ForgotPassword from "../../components/ForgotPassword";
 
 type LoginFormValues = {
-  name: string
-  password: string
-  role: string
-}
+  name: string;
+  password: string;
+  role: string;
+};
 
 const WorkerLogin = () => {
-  const [isLoading, setIsLoading] = useState(false)
-  const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const navigate = useNavigate()
+  const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
 
-    const formData = new FormData(e.currentTarget)
+    const formData = new FormData(e.currentTarget);
     const values: LoginFormValues = {
       name: formData.get("name") as string,
       password: formData.get("password") as string,
       role: formData.get("role") as string,
-    }
+    };
 
     try {
-      const response = await axios.post(`http://localhost:3001/worker/login`, values)
+      const response = await axios.post(
+        `https://maintenance-system-backend-production.up.railway.app/worker/login`,
+        values
+      );
 
       if (response.data.status === "success") {
-        const userData = response.data.data.user
-        toast.success("Login successful")
-        localStorage.setItem("user", JSON.stringify(userData))
+        const userData = response.data.data.user;
+        toast.success("Login successful");
+        localStorage.setItem("user", JSON.stringify(userData));
 
-        navigate("/workerdashboard", { replace: true })
+        navigate("/workerdashboard", { replace: true });
       } else {
-        toast.error("Unexpected response format")
-        console.error("Unexpected response:", response.data)
+        toast.error("Unexpected response format");
+        console.error("Unexpected response:", response.data);
       }
     } catch (error: any) {
-      console.error("Login error:", error)
+      console.error("Login error:", error);
 
       if (error.response) {
         switch (error.response.status) {
           case 400:
-            toast.error("All fields are required")
-            break
+            toast.error("All fields are required");
+            break;
           case 401:
-            toast.error("Incorrect credentials")
-            break
+            toast.error("Incorrect credentials");
+            break;
           default:
-            toast.error("Login failed. Please try again.")
+            toast.error("Login failed. Please try again.");
         }
       } else {
-        toast.error("Network error. Please check your connection.")
+        toast.error("Network error. Please check your connection.");
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   if (showForgotPassword) {
-    return <ForgotPassword userType="worker" onBack={() => setShowForgotPassword(false)} />
+    return (
+      <ForgotPassword
+        userType="worker"
+        onBack={() => setShowForgotPassword(false)}
+      />
+    );
   }
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-gray-50 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-md p-8">
         <div className="flex justify-center mb-6">
-          <img src={Logo || "/placeholder.svg"} alt="Logo" className="max-w-[100px]" />
+          <img
+            src={Logo || "/placeholder.svg"}
+            alt="Logo"
+            className="max-w-[100px]"
+          />
         </div>
-        <h2 className="text-2xl font-bold mb-6 text-center">Maintenance Worker Login</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">
+          Maintenance Worker Login
+        </h2>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-1">
@@ -126,7 +140,10 @@ const WorkerLogin = () => {
           <div className="flex justify-between items-center text-sm">
             <p>
               Don't have an account?{" "}
-              <a href="/worker/register" className="underline hover:text-purple-500">
+              <a
+                href="/worker/register"
+                className="underline hover:text-purple-500"
+              >
                 Sign Up
               </a>
             </p>
@@ -149,7 +166,7 @@ const WorkerLogin = () => {
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default WorkerLogin
+export default WorkerLogin;

@@ -1,100 +1,105 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
-import axios from "axios"
-import { toast } from "react-hot-toast"
-import Header from "@/components/Header"
-import RequestImage from "@/components/RequestImage"
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "react-hot-toast";
+import Header from "@/components/Header";
+import RequestImage from "@/components/RequestImage";
 
 interface MaintenanceRequest {
-  _id: string
-  title: string
-  category: string
-  location: string
-  description: string
-  status: string
-  priority: string
-  priorityScore?: number
-  createdAt: string
-  studentRegNumber: string
-  imageData?: string
-  imageContentType?: string
-  workerFeedback?: string
-  rating?: number
-  assignedAt?: string
+  _id: string;
+  title: string;
+  category: string;
+  location: string;
+  description: string;
+  status: string;
+  priority: string;
+  priorityScore?: number;
+  createdAt: string;
+  studentRegNumber: string;
+  imageData?: string;
+  imageContentType?: string;
+  workerFeedback?: string;
+  rating?: number;
+  assignedAt?: string;
 }
 
 const WorkerDashboard = () => {
-  const [requests, setRequests] = useState<MaintenanceRequest[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [workerRole, setWorkerRole] = useState<string>("")
-  const [workerId, setWorkerId] = useState<string>("")
-  const [statusFilter, setStatusFilter] = useState<string>("")
-  const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null)
-  const [feedback, setFeedback] = useState<string>("")
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [viewMode, setViewMode] = useState<"standard" | "prioritized">("standard")
+  const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [workerRole, setWorkerRole] = useState<string>("");
+  const [workerId, setWorkerId] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [selectedRequest, setSelectedRequest] =
+    useState<MaintenanceRequest | null>(null);
+  const [feedback, setFeedback] = useState<string>("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [viewMode, setViewMode] = useState<"standard" | "prioritized">(
+    "standard"
+  );
   const [performanceStats, setPerformanceStats] = useState({
     performanceScore: 0,
     averageRating: 0,
     averageResolutionTime: 0,
     completedTasks: 0,
-  })
-  const [isSavingFeedback, setIsSavingFeedback] = useState(false)
-  const [isDeletingFeedback, setIsDeletingFeedback] = useState(false)
-  const navigate = useNavigate()
+  });
+  const [isSavingFeedback, setIsSavingFeedback] = useState(false);
+  const [isDeletingFeedback, setIsDeletingFeedback] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const userData = localStorage.getItem("user")
+    const userData = localStorage.getItem("user");
     if (userData) {
       try {
-        const parsedData = JSON.parse(userData)
+        const parsedData = JSON.parse(userData);
         if (parsedData.userType !== "worker") {
-          toast.error("Unauthorized access")
-          navigate("/")
-          return
+          toast.error("Unauthorized access");
+          navigate("/");
+          return;
         }
-        setWorkerRole(parsedData.role)
-        setWorkerId(parsedData.id)
-        fetchRequests(parsedData.id)
-        fetchWorkerStats(parsedData.id)
+        setWorkerRole(parsedData.role);
+        setWorkerId(parsedData.id);
+        fetchRequests(parsedData.id);
+        fetchWorkerStats(parsedData.id);
       } catch (error) {
-        console.error("Error parsing user data:", error)
-        setError("Could not load user data. Please log in again.")
-        navigate("/worker")
+        console.error("Error parsing user data:", error);
+        setError("Could not load user data. Please log in again.");
+        navigate("/worker");
       }
     } else {
-      setError("User not logged in")
-      navigate("/worker")
+      setError("User not logged in");
+      navigate("/worker");
     }
-  }, [navigate])
+  }, [navigate]);
 
   const fetchRequests = async (workerId: string, status = "") => {
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
-      console.log(`Fetching assigned requests for worker ID: ${workerId}`)
-      const url = `http://localhost:3001/api/worker/requests/${workerId}${status ? `?status=${status}` : ""}`
+      console.log(`Fetching assigned requests for worker ID: ${workerId}`);
+      const url = `https://maintenance-system-backend-production.up.railway.app/api/worker/requests/${workerId}${
+        status ? `?status=${status}` : ""
+      }`;
 
-      const response = await axios.get(url)
-      setRequests(response.data)
+      const response = await axios.get(url);
+      setRequests(response.data);
     } catch (error) {
-      console.error("Error fetching requests:", error)
-      setError("Failed to load maintenance requests. Please try again later.")
+      console.error("Error fetching requests:", error);
+      setError("Failed to load maintenance requests. Please try again later.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const fetchPrioritizedRequests = async (role: string, status = "") => {
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
       const roleToCategory: Record<string, string> = {
@@ -102,34 +107,42 @@ const WorkerDashboard = () => {
         Plumber: "Plumbing",
         Carpenter: "Carpenter",
         Other: "Other",
-      }
+      };
 
-      const category = roleToCategory[role as keyof typeof roleToCategory] || role
+      const category =
+        roleToCategory[role as keyof typeof roleToCategory] || role;
 
-      let url = "http://localhost:3001/api/admin/prioritized-requests"
-      const params = new URLSearchParams()
+      let url =
+        "https://maintenance-system-backend-production.up.railway.app/api/admin/prioritized-requests";
+      const params = new URLSearchParams();
 
-      params.append("category", category)
-      if (status) params.append("status", status)
+      params.append("category", category);
+      if (status) params.append("status", status);
 
-      url += `?${params.toString()}`
+      url += `?${params.toString()}`;
 
-      const response = await axios.get(url)
-      setRequests(response.data)
+      const response = await axios.get(url);
+      setRequests(response.data);
     } catch (error) {
-      console.error("Error fetching prioritized requests:", error)
-      setError("Failed to load prioritized maintenance requests. Please try again later.")
+      console.error("Error fetching prioritized requests:", error);
+      setError(
+        "Failed to load prioritized maintenance requests. Please try again later."
+      );
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const fetchWorkerStats = async (workerId: string) => {
     try {
-      const response = await axios.get(`http://localhost:3001/api/admin/worker-statistics`)
-      const allWorkers = response.data
+      const response = await axios.get(
+        `https://maintenance-system-backend-production.up.railway.app/api/admin/worker-statistics`
+      );
+      const allWorkers = response.data;
 
-      const currentWorker = allWorkers.find((worker: any) => worker._id === workerId)
+      const currentWorker = allWorkers.find(
+        (worker: any) => worker._id === workerId
+      );
 
       if (currentWorker) {
         setPerformanceStats({
@@ -137,145 +150,161 @@ const WorkerDashboard = () => {
           averageRating: currentWorker.averageRating || 0,
           averageResolutionTime: currentWorker.averageResolutionTime || 0,
           completedTasks: currentWorker.workload?.completed || 0,
-        })
+        });
       }
     } catch (error) {
-      console.error("Error fetching worker stats:", error)
+      console.error("Error fetching worker stats:", error);
     }
-  }
+  };
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const status = e.target.value
-    setStatusFilter(status)
+    const status = e.target.value;
+    setStatusFilter(status);
 
     if (viewMode === "prioritized") {
-      fetchPrioritizedRequests(workerRole, status)
+      fetchPrioritizedRequests(workerRole, status);
     } else {
-      fetchRequests(workerId, status)
+      fetchRequests(workerId, status);
     }
-  }
+  };
 
   const handleViewModeChange = (mode: "standard" | "prioritized") => {
-    setViewMode(mode)
+    setViewMode(mode);
     if (mode === "prioritized") {
-      fetchPrioritizedRequests(workerRole, statusFilter)
+      fetchPrioritizedRequests(workerRole, statusFilter);
     } else {
-      fetchRequests(workerId, statusFilter)
+      fetchRequests(workerId, statusFilter);
     }
-  }
+  };
 
   const handleSaveFeedback = async () => {
-    if (!selectedRequest) return
+    if (!selectedRequest) return;
 
-    setIsSavingFeedback(true)
+    setIsSavingFeedback(true);
 
     try {
-      const response = await axios.patch(`http://localhost:3001/api/requests/${selectedRequest._id}/feedback`, {
-        workerFeedback: feedback,
-      })
+      const response = await axios.patch(
+        `https://maintenance-system-backend-production.up.railway.app/api/requests/${selectedRequest._id}/feedback`,
+        {
+          workerFeedback: feedback,
+        }
+      );
 
       if (response.status === 200) {
-        toast.success("Feedback saved successfully")
+        toast.success("Feedback saved successfully");
 
         setRequests(
-          requests.map((req) => (req._id === selectedRequest._id ? { ...req, workerFeedback: feedback } : req)),
-        )
+          requests.map((req) =>
+            req._id === selectedRequest._id
+              ? { ...req, workerFeedback: feedback }
+              : req
+          )
+        );
 
-        setSelectedRequest({ ...selectedRequest, workerFeedback: feedback })
+        setSelectedRequest({ ...selectedRequest, workerFeedback: feedback });
       }
     } catch (error) {
-      console.error("Error saving feedback:", error)
-      toast.error("Failed to save feedback")
+      console.error("Error saving feedback:", error);
+      toast.error("Failed to save feedback");
     } finally {
-      setIsSavingFeedback(false)
+      setIsSavingFeedback(false);
     }
-  }
+  };
 
   const handleDeleteFeedback = async () => {
-    if (!selectedRequest) return
+    if (!selectedRequest) return;
 
-    setIsDeletingFeedback(true)
+    setIsDeletingFeedback(true);
 
     try {
-      const response = await axios.delete(`http://localhost:3001/api/requests/${selectedRequest._id}/feedback`)
+      const response = await axios.delete(
+        `https://maintenance-system-backend-production.up.railway.app/api/requests/${selectedRequest._id}/feedback`
+      );
 
       if (response.status === 200) {
-        toast.success("Feedback deleted successfully")
-        setFeedback("")
+        toast.success("Feedback deleted successfully");
+        setFeedback("");
 
         setRequests(
-          requests.map((req) => (req._id === selectedRequest._id ? { ...req, workerFeedback: undefined } : req)),
-        )
+          requests.map((req) =>
+            req._id === selectedRequest._id
+              ? { ...req, workerFeedback: undefined }
+              : req
+          )
+        );
 
-        setSelectedRequest({ ...selectedRequest, workerFeedback: undefined })
+        setSelectedRequest({ ...selectedRequest, workerFeedback: undefined });
       }
     } catch (error) {
-      console.error("Error deleting feedback:", error)
-      toast.error("Failed to delete feedback")
+      console.error("Error deleting feedback:", error);
+      toast.error("Failed to delete feedback");
     } finally {
-      setIsDeletingFeedback(false)
+      setIsDeletingFeedback(false);
     }
-  }
+  };
 
   const handleUpdateStatus = async (newStatus: string) => {
-    if (!selectedRequest) return
+    if (!selectedRequest) return;
 
-    setIsUpdating(true)
+    setIsUpdating(true);
 
     try {
       const payload: any = {
         status: newStatus,
-      }
+      };
 
       if (selectedRequest.workerFeedback) {
-        payload.workerFeedback = selectedRequest.workerFeedback
+        payload.workerFeedback = selectedRequest.workerFeedback;
       }
 
-      const response = await axios.patch(`http://localhost:3001/api/requests/${selectedRequest._id}`, payload)
+      const response = await axios.patch(
+        `https://maintenance-system-backend-production.up.railway.app/api/requests/${selectedRequest._id}`,
+        payload
+      );
 
       if (response.status === 200) {
-        toast.success(`Request marked as ${newStatus}`)
-        setIsModalOpen(false)
-        setFeedback("")
+        toast.success(`Request marked as ${newStatus}`);
+        setIsModalOpen(false);
+        setFeedback("");
 
         if (viewMode === "prioritized") {
-          fetchPrioritizedRequests(workerRole, statusFilter)
+          fetchPrioritizedRequests(workerRole, statusFilter);
         } else {
-          fetchRequests(workerId, statusFilter)
+          fetchRequests(workerId, statusFilter);
         }
 
         if (newStatus === "Completed") {
-          fetchWorkerStats(workerId)
+          fetchWorkerStats(workerId);
         }
       }
     } catch (error) {
-      console.error("Error updating request:", error)
-      toast.error("Failed to update request status")
+      console.error("Error updating request:", error);
+      toast.error("Failed to update request status");
     } finally {
-      setIsUpdating(false)
+      setIsUpdating(false);
     }
-  }
+  };
 
   const openRequestModal = (request: MaintenanceRequest) => {
-    setSelectedRequest(request)
-    setFeedback(request.workerFeedback || "")
-    setIsModalOpen(true)
-  }
+    setSelectedRequest(request);
+    setFeedback(request.workerFeedback || "");
+    setIsModalOpen(true);
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "Critical":
-        return "bg-red-100 text-red-800"
+        return "bg-red-100 text-red-800";
       case "High":
-        return "bg-orange-100 text-orange-800"
+        return "bg-orange-100 text-orange-800";
       case "Medium":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-800";
       case "Low":
-        return "bg-green-100 text-green-800"
+        return "bg-green-100 text-green-800";
       default:
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-800";
     }
-  }
+  };
 
   return (
     <>
@@ -284,7 +313,9 @@ const WorkerDashboard = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold">Maintenance Worker Dashboard</h1>
-          <p className="text-gray-600">Manage maintenance requests assigned to you</p>
+          <p className="text-gray-600">
+            Manage maintenance requests assigned to you
+          </p>
         </div>
 
         {/* Worker Stats */}
@@ -297,16 +328,25 @@ const WorkerDashboard = () => {
                 <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
                   <div
                     className="bg-blue-600 h-2.5 rounded-full"
-                    style={{ width: `${Math.min(performanceStats.performanceScore * 20, 100)}%` }}
+                    style={{
+                      width: `${Math.min(
+                        performanceStats.performanceScore * 20,
+                        100
+                      )}%`,
+                    }}
                   ></div>
                 </div>
-                <span className="text-sm font-medium">{performanceStats.performanceScore.toFixed(1)}</span>
+                <span className="text-sm font-medium">
+                  {performanceStats.performanceScore.toFixed(1)}
+                </span>
               </div>
             </div>
             <div className="bg-gray-50 p-3 rounded">
               <h4 className="text-sm text-gray-500">Average Rating</h4>
               <p className="text-xl font-medium">
-                {performanceStats.averageRating ? performanceStats.averageRating.toFixed(1) : "N/A"}
+                {performanceStats.averageRating
+                  ? performanceStats.averageRating.toFixed(1)
+                  : "N/A"}
               </p>
             </div>
             <div className="bg-gray-50 p-3 rounded">
@@ -319,7 +359,9 @@ const WorkerDashboard = () => {
             </div>
             <div className="bg-gray-50 p-3 rounded">
               <h4 className="text-sm text-gray-500">Completed Tasks</h4>
-              <p className="text-xl font-medium">{performanceStats.completedTasks}</p>
+              <p className="text-xl font-medium">
+                {performanceStats.completedTasks}
+              </p>
             </div>
           </div>
         </div>
@@ -328,14 +370,19 @@ const WorkerDashboard = () => {
         <div className="mb-6 flex flex-wrap justify-between items-center">
           <div className="flex flex-wrap gap-4 items-end">
             <div>
-              <label htmlFor="viewMode" className="block text-sm font-medium mb-1">
+              <label
+                htmlFor="viewMode"
+                className="block text-sm font-medium mb-1"
+              >
                 View Mode:
               </label>
               <div className="flex rounded-md overflow-hidden border border-gray-300">
                 <button
                   onClick={() => handleViewModeChange("standard")}
                   className={`px-4 py-1.5 ${
-                    viewMode === "standard" ? "bg-black text-white" : "bg-white text-gray-700"
+                    viewMode === "standard"
+                      ? "bg-black text-white"
+                      : "bg-white text-gray-700"
                   }`}
                 >
                   Standard
@@ -343,7 +390,9 @@ const WorkerDashboard = () => {
                 <button
                   onClick={() => handleViewModeChange("prioritized")}
                   className={`px-4 py-1.5 ${
-                    viewMode === "prioritized" ? "bg-black text-white" : "bg-white text-gray-700"
+                    viewMode === "prioritized"
+                      ? "bg-black text-white"
+                      : "bg-white text-gray-700"
                   }`}
                 >
                   Prioritized
@@ -352,7 +401,10 @@ const WorkerDashboard = () => {
             </div>
 
             <div>
-              <label htmlFor="statusFilter" className="block text-sm font-medium mb-1">
+              <label
+                htmlFor="statusFilter"
+                className="block text-sm font-medium mb-1"
+              >
                 Filter by status:
               </label>
               <select
@@ -386,7 +438,9 @@ const WorkerDashboard = () => {
           </div>
         ) : requests.length === 0 ? (
           <div className="text-center py-8 bg-gray-50 rounded-lg">
-            <p className="text-gray-500">No maintenance requests assigned to you.</p>
+            <p className="text-gray-500">
+              No maintenance requests assigned to you.
+            </p>
           </div>
         ) : (
           <div className="grid gap-6">
@@ -400,12 +454,15 @@ const WorkerDashboard = () => {
                   <div>
                     <h3 className="font-bold text-lg">{request.title}</h3>
                     <p className="text-sm text-gray-600">
-                      {request.category} • {request.location} • Student: {request.studentRegNumber}
+                      {request.category} • {request.location} • Student:{" "}
+                      {request.studentRegNumber}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     <span
-                      className={`px-3 py-1 text-sm rounded-full ${getPriorityColor(request.priority || "Medium")}`}
+                      className={`px-3 py-1 text-sm rounded-full ${getPriorityColor(
+                        request.priority || "Medium"
+                      )}`}
                     >
                       {request.priority || "Medium"}
                     </span>
@@ -414,8 +471,8 @@ const WorkerDashboard = () => {
                         request.status === "Completed"
                           ? "bg-green-100 text-green-800"
                           : request.status === "In Progress"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
                       }`}
                     >
                       {request.status}
@@ -427,7 +484,11 @@ const WorkerDashboard = () => {
                 {/* Image Display */}
                 {request.imageData && (
                   <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                    <RequestImage requestId={request._id} requestTitle={request.title} className="inline-block" />
+                    <RequestImage
+                      requestId={request._id}
+                      requestTitle={request.title}
+                      className="inline-block"
+                    />
                   </div>
                 )}
 
@@ -439,7 +500,8 @@ const WorkerDashboard = () => {
                 )}
                 <div className="mt-2 flex justify-between">
                   <p className="text-xs text-gray-500">
-                    Submitted on {new Date(request.createdAt).toLocaleDateString()}
+                    Submitted on{" "}
+                    {new Date(request.createdAt).toLocaleDateString()}
                   </p>
                   {viewMode === "prioritized" && request.priorityScore && (
                     <p className="text-xs font-medium bg-purple-100 text-purple-800 px-2 py-1 rounded">
@@ -460,7 +522,10 @@ const WorkerDashboard = () => {
             <div className="p-6">
               <div className="flex justify-between items-start">
                 <h2 className="text-xl font-bold">{selectedRequest.title}</h2>
-                <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"
@@ -487,18 +552,20 @@ const WorkerDashboard = () => {
                         selectedRequest.status === "Completed"
                           ? "bg-green-100 text-green-800"
                           : selectedRequest.status === "In Progress"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
                       }`}
                     >
                       {selectedRequest.status}
                     </p>
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-500">Priority</p>
+                    <p className="text-sm font-medium text-gray-500">
+                      Priority
+                    </p>
                     <p
                       className={`inline-block px-3 py-1 text-sm rounded-full mt-1 ${getPriorityColor(
-                        selectedRequest.priority || "Medium",
+                        selectedRequest.priority || "Medium"
                       )}`}
                     >
                       {selectedRequest.priority || "Medium"}
@@ -517,7 +584,9 @@ const WorkerDashboard = () => {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Description</p>
+                  <p className="text-sm font-medium text-gray-500">
+                    Description
+                  </p>
                   <p>{selectedRequest.description}</p>
                 </div>
 
@@ -525,7 +594,10 @@ const WorkerDashboard = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-500">Image</p>
                     <div className="mt-2">
-                      <RequestImage requestId={selectedRequest._id} requestTitle={selectedRequest.title} />
+                      <RequestImage
+                        requestId={selectedRequest._id}
+                        requestTitle={selectedRequest.title}
+                      />
                     </div>
                   </div>
                 )}
@@ -569,7 +641,8 @@ const WorkerDashboard = () => {
                     </button>
                   )}
 
-                  {(selectedRequest.status === "Pending" || selectedRequest.status === "In Progress") && (
+                  {(selectedRequest.status === "Pending" ||
+                    selectedRequest.status === "In Progress") && (
                     <button
                       onClick={() => handleUpdateStatus("Completed")}
                       disabled={isUpdating}
@@ -592,7 +665,7 @@ const WorkerDashboard = () => {
         </div>
       )}
     </>
-  )
-}
+  );
+};
 
-export default WorkerDashboard
+export default WorkerDashboard;

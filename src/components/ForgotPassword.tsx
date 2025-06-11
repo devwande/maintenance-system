@@ -57,7 +57,7 @@ const ForgotPassword = ({ userType, onBack }: ForgotPasswordProps) => {
     setIsLoading(true)
 
     try {
-      const response = await axios.post("http://localhost:3001/reset-password", {
+      const response = await axios.post("https://maintenance-system-backend-production.up.railway.app/reset-password", {
         email,
         userType,
         newPassword,

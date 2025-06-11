@@ -1,82 +1,97 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import axios from "axios"
-import { toast } from "react-hot-toast"
-import Logo from "../../assets/cu_logo.jpg"
-import ForgotPassword from "../../components/ForgotPassword"
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "react-hot-toast";
+import Logo from "../../assets/cu_logo.jpg";
+import ForgotPassword from "../../components/ForgotPassword";
 
 type LoginFormValues = {
-  regNumber: string
-  password: string
-}
+  regNumber: string;
+  password: string;
+};
 
 const Login = () => {
-  const [isLoading, setIsLoading] = useState(false)
-  const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const navigate = useNavigate()
+  const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
 
-    const formData = new FormData(e.currentTarget)
+    const formData = new FormData(e.currentTarget);
     const values: LoginFormValues = {
       regNumber: formData.get("regNumber") as string,
       password: formData.get("password") as string,
-    }
+    };
 
     try {
-      const response = await axios.post(`http://localhost:3001/login`, values)
+      const response = await axios.post(
+        `https://maintenance-system-backend-production.up.railway.app/login`,
+        values
+      );
 
-      if (response.data.status === "success" || response.data.message === "Login successful") {
-        const userData = response.data.user || response.data.data?.user
-        toast.success("Login successful")
-        localStorage.setItem("user", JSON.stringify(userData))
+      if (
+        response.data.status === "success" ||
+        response.data.message === "Login successful"
+      ) {
+        const userData = response.data.user || response.data.data?.user;
+        toast.success("Login successful");
+        localStorage.setItem("user", JSON.stringify(userData));
 
-        navigate("/studentdashboard", { replace: true })
-        window.location.reload()
+        navigate("/studentdashboard", { replace: true });
+        window.location.reload();
       } else {
-        toast.error("Unexpected response format")
-        console.error("Unexpected response:", response.data)
+        toast.error("Unexpected response format");
+        console.error("Unexpected response:", response.data);
       }
     } catch (error: any) {
-      console.error("Login error:", error)
+      console.error("Login error:", error);
 
       if (error.response) {
         switch (error.response.status) {
           case 400:
-            toast.error("Registration number and password are required")
-            break
+            toast.error("Registration number and password are required");
+            break;
           case 401:
-            toast.error("Incorrect password")
-            break
+            toast.error("Incorrect password");
+            break;
           case 404:
-            toast.error("No account found with this registration number")
-            break
+            toast.error("No account found with this registration number");
+            break;
           default:
-            toast.error("Login failed. Please try again.")
+            toast.error("Login failed. Please try again.");
         }
       } else {
-        toast.error("Network error. Please check your connection.")
+        toast.error("Network error. Please check your connection.");
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   if (showForgotPassword) {
-    return <ForgotPassword userType="student" onBack={() => setShowForgotPassword(false)} />
+    return (
+      <ForgotPassword
+        userType="student"
+        onBack={() => setShowForgotPassword(false)}
+      />
+    );
   }
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-gray-50 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-md p-8">
         <div className="flex justify-center mb-6">
-          <img src={Logo || "/placeholder.svg"} alt="Logo" className="max-w-[100px]" />
+          <img
+            src={Logo || "/placeholder.svg"}
+            alt="Logo"
+            className="max-w-[100px]"
+          />
         </div>
         <h2 className="text-2xl font-bold mb-6 text-center">Student Login</h2>
 
@@ -133,7 +148,7 @@ const Login = () => {
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;

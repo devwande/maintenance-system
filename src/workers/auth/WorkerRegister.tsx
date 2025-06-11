@@ -38,7 +38,7 @@ const WorkerRegister = () => {
   const registerMutation = useMutation({
     mutationFn: (userData: Omit<FormValues, "confirmPassword">) => {
       return axios.post(
-        `http://localhost:3001/worker/register`,
+        `https://maintenance-system-backend-production.up.railway.app/worker/register`,
         userData,
         {
           headers: {
