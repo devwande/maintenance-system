@@ -83,7 +83,7 @@ const WorkerDashboard = () => {
 
     try {
       console.log(`Fetching assigned requests for worker ID: ${workerId}`);
-      const url = `https://maintenance-system-backend-production.up.railway.app/api/worker/requests/${workerId}${
+      const url = `http://localhost:3001/api/worker/requests/${workerId}${
         status ? `?status=${status}` : ""
       }`;
 
@@ -112,8 +112,7 @@ const WorkerDashboard = () => {
       const category =
         roleToCategory[role as keyof typeof roleToCategory] || role;
 
-      let url =
-        "https://maintenance-system-backend-production.up.railway.app/api/admin/prioritized-requests";
+      let url = "http://localhost:3001/api/admin/prioritized-requests";
       const params = new URLSearchParams();
 
       params.append("category", category);
@@ -136,7 +135,7 @@ const WorkerDashboard = () => {
   const fetchWorkerStats = async (workerId: string) => {
     try {
       const response = await axios.get(
-        `https://maintenance-system-backend-production.up.railway.app/api/admin/worker-statistics`
+        `http://localhost:3001/api/admin/worker-statistics`
       );
       const allWorkers = response.data;
 
@@ -184,7 +183,7 @@ const WorkerDashboard = () => {
 
     try {
       const response = await axios.patch(
-        `https://maintenance-system-backend-production.up.railway.app/api/requests/${selectedRequest._id}/feedback`,
+        `http://localhost:3001/api/requests/${selectedRequest._id}/feedback`,
         {
           workerFeedback: feedback,
         }
@@ -218,7 +217,7 @@ const WorkerDashboard = () => {
 
     try {
       const response = await axios.delete(
-        `https://maintenance-system-backend-production.up.railway.app/api/requests/${selectedRequest._id}/feedback`
+        `http://localhost:3001/api/requests/${selectedRequest._id}/feedback`
       );
 
       if (response.status === 200) {
@@ -258,7 +257,7 @@ const WorkerDashboard = () => {
       }
 
       const response = await axios.patch(
-        `https://maintenance-system-backend-production.up.railway.app/api/requests/${selectedRequest._id}`,
+        `http://localhost:3001/api/requests/${selectedRequest._id}`,
         payload
       );
 

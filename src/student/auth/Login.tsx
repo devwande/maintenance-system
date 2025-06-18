@@ -30,10 +30,7 @@ const Login = () => {
     };
 
     try {
-      const response = await axios.post(
-        `https://maintenance-system-backend-production.up.railway.app/login`,
-        values
-      );
+      const response = await axios.post(`http://localhost:3001/login`, values);
 
       if (
         response.data.status === "success" ||

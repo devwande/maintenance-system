@@ -37,15 +37,11 @@ const WorkerRegister = () => {
 
   const registerMutation = useMutation({
     mutationFn: (userData: Omit<FormValues, "confirmPassword">) => {
-      return axios.post(
-        `https://maintenance-system-backend-production.up.railway.app/worker/register`,
-        userData,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      return axios.post(`http://localhost:3001/worker/register`, userData, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
     },
     onError: (error: any) => {
       console.log("Full error object:", error);

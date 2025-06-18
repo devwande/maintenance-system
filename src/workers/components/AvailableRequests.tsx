@@ -46,7 +46,7 @@ const AvailableRequests = ({
     setIsLoading(true);
     try {
       const response = await axios.get(
-        `https://maintenance-system-backend-production.up.railway.app/api/worker/available-requests/${workerRole}`
+        `http://localhost:3001/api/worker/available-requests/${workerRole}`
       );
       setAvailableRequests(response.data);
     } catch (error) {
@@ -60,7 +60,7 @@ const AvailableRequests = ({
     setIsClaimingRequest(requestId);
     try {
       const response = await axios.patch(
-        `https://maintenance-system-backend-production.up.railway.app/api/requests/${requestId}`,
+        `http://localhost:3001/api/requests/${requestId}`,
         {
           assignedTo: workerId,
           assignedAt: new Date(),

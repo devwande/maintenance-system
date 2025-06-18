@@ -21,7 +21,7 @@ const RequestImage = ({
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const imageUrl = `https://maintenance-system-backend-production.up.railway.app/api/requests/image/${requestId}`;
+  const imageUrl = `http://localhost:3001/api/requests/image/${requestId}`;
 
   const handleImageClick = () => {
     if (!hasError) {

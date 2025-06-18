@@ -17,7 +17,7 @@ const app = express()
 app.use("/server/uploads", express.static("uploads"))
 
 const PORT = process.env.PORT || 3001
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/student"
+const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/"
 const JWT_SECRET = process.env.JWT_SECRET
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "90d"
 

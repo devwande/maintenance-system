@@ -78,7 +78,7 @@ const StudentDashboard = () => {
 
     try {
       const response = await axios.get(
-        `https://maintenance-system-backend-production.up.railway.app/api/requests/student/${regNumber}`
+        `http://localhost:3001/api/requests/student/${regNumber}`
       );
       const data = response.data;
 
@@ -142,15 +142,11 @@ const StudentDashboard = () => {
         formDataToSend.append("image", formData.image);
       }
 
-      await axios.post(
-        `https://maintenance-system-backend-production.up.railway.app/api/requests`,
-        formDataToSend,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      await axios.post(`http://localhost:3001/api/requests`, formDataToSend, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -182,7 +178,7 @@ const StudentDashboard = () => {
 
     try {
       const response = await axios.post(
-        `https://maintenance-system-backend-production.up.railway.app/api/requests/${selectedRequestForRating._id}/rate`,
+        `http://localhost:3001/api/requests/${selectedRequestForRating._id}/rate`,
         {
           rating: currentRating,
         }
@@ -228,9 +224,9 @@ const StudentDashboard = () => {
         <Header />
 
         {/* Notification Center */}
-        <div className="relative ml-auto mr-4 mt-4 flex justify-end">
+        {/* <div className="relative ml-auto mr-4 mt-4 flex justify-end">
           <NotificationCenter requests={requests} />
-        </div>
+        </div> */}
 
         <section className="px-4">
           <div className="flex justify-between">
@@ -488,7 +484,7 @@ const StudentDashboard = () => {
                 {request.imageData && (
                   <div className="mt-2">
                     <img
-                      src={`https://maintenance-system-backend-production.up.railway.app/api/requests/image/${request._id}`}
+                      src={`http://localhost:3001/api/requests/image/${request._id}`}
                       alt="Request"
                       className="max-h-40 w-auto rounded-md object-cover shadow-sm border border-gray-200"
                       onError={(e) => {

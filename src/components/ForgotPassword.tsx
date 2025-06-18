@@ -1,92 +1,100 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import axios from "axios"
-import { toast } from "react-hot-toast"
-import { ArrowLeft, Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { useState } from "react";
+import axios from "axios";
+import { toast } from "react-hot-toast";
+import { ArrowLeft, Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 interface ForgotPasswordProps {
-  userType: "student" | "worker"
-  onBack: () => void
+  userType: "student" | "worker";
+  onBack: () => void;
 }
 
 const ForgotPassword = ({ userType, onBack }: ForgotPasswordProps) => {
-  const [step, setStep] = useState<"email" | "reset">("email")
-  const [email, setEmail] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [step, setStep] = useState<"email" | "reset">("email");
+  const [email, setEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!email) {
-      toast.error("Please enter your email address")
-      return
+      toast.error("Please enter your email address");
+      return;
     }
 
     // In a real app, you would send a verification email here
     // For this demo, we'll just proceed to the reset step
-    setStep("reset")
-    toast.success("Email verified! Please enter your new password.")
-  }
+    setStep("reset");
+    toast.success("Email verified! Please enter your new password.");
+  };
 
   const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!newPassword || !confirmPassword) {
-      toast.error("Please fill in all fields")
-      return
+      toast.error("Please fill in all fields");
+      return;
     }
 
     if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters long")
-      return
+      toast.error("Password must be at least 6 characters long");
+      return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match")
-      return
+      toast.error("Passwords do not match");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
-      const response = await axios.post("https://maintenance-system-backend-production.up.railway.app/reset-password", {
-        email,
-        userType,
-        newPassword,
-      })
+      const response = await axios.post(
+        "http://localhost:3001/reset-password",
+        {
+          email,
+          userType,
+          newPassword,
+        }
+      );
 
       if (response.data.status === "success") {
-        toast.success("Password reset successfully!")
-        onBack() // Go back to login
+        toast.success("Password reset successfully!");
+        onBack(); // Go back to login
       }
     } catch (error: any) {
-      console.error("Password reset error:", error)
+      console.error("Password reset error:", error);
 
       if (error.response?.data?.message) {
-        toast.error(error.response.data.message)
+        toast.error(error.response.data.message);
       } else {
-        toast.error("Failed to reset password. Please try again.")
+        toast.error("Failed to reset password. Please try again.");
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-gray-50 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-md p-8">
         {/* Header */}
         <div className="flex items-center mb-6">
-          <button onClick={onBack} className="mr-3 p-2 rounded-full hover:bg-gray-100 transition-colors">
+          <button
+            onClick={onBack}
+            className="mr-3 p-2 rounded-full hover:bg-gray-100 transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-2xl font-bold">{step === "email" ? "Forgot Password" : "Reset Password"}</h2>
+          <h2 className="text-2xl font-bold">
+            {step === "email" ? "Forgot Password" : "Reset Password"}
+          </h2>
         </div>
 
         {step === "email" ? (
@@ -94,7 +102,9 @@ const ForgotPassword = ({ userType, onBack }: ForgotPasswordProps) => {
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             <div className="text-center mb-6">
               <Mail className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Enter your email address and we'll help you reset your password.</p>
+              <p className="text-gray-600">
+                Enter your email address and we'll help you reset your password.
+              </p>
             </div>
 
             <div className="space-y-1">
@@ -112,7 +122,10 @@ const ForgotPassword = ({ userType, onBack }: ForgotPasswordProps) => {
               />
             </div>
 
-            <button type="submit" className="w-full bg-black hover:bg-gray-800 text-white py-2 rounded-lg transition">
+            <button
+              type="submit"
+              className="w-full bg-black hover:bg-gray-800 text-white py-2 rounded-lg transition"
+            >
               Continue
             </button>
           </form>
@@ -121,7 +134,9 @@ const ForgotPassword = ({ userType, onBack }: ForgotPasswordProps) => {
           <form onSubmit={handlePasswordReset} className="space-y-4">
             <div className="text-center mb-6">
               <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Create a new password for your account.</p>
+              <p className="text-gray-600">
+                Create a new password for your account.
+              </p>
               <p className="text-sm text-gray-500 mt-2">Email: {email}</p>
             </div>
 
@@ -144,7 +159,11 @@ const ForgotPassword = ({ userType, onBack }: ForgotPasswordProps) => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -168,7 +187,11 @@ const ForgotPassword = ({ userType, onBack }: ForgotPasswordProps) => {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
                 >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -194,7 +217,7 @@ const ForgotPassword = ({ userType, onBack }: ForgotPasswordProps) => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ForgotPassword
+export default ForgotPassword;

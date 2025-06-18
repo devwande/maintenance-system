@@ -34,12 +34,10 @@ export const assignWorkerToRequest = async (requestId, changeStatus = true) => {
       return { success: false, message: "Request already assigned" }
     }
 
-    // Get the worker role needed for this category
     const requiredRole = categoryToRoleMap[request.category] || request.category
 
     console.log(`Looking for workers with role: ${requiredRole} for category: ${request.category}`)
 
-    // Find all workers with the required role
     const eligibleWorkers = await WorkerModel.find({ role: requiredRole })
 
     console.log(
@@ -55,10 +53,8 @@ export const assignWorkerToRequest = async (requestId, changeStatus = true) => {
       }
     }
 
-    // Get the current workload for each eligible worker
     const workerWorkloads = await Promise.all(
       eligibleWorkers.map(async (worker) => {
-        // Count all active requests (Pending + In Progress)
         const activeRequestsCount = await MaintenanceRequest.countDocuments({
           assignedTo: worker._id,
           status: { $in: ["Pending", "In Progress"] },

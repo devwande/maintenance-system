@@ -4,6 +4,22 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import Logo from "../../assets/cu_logo.jpg"
 import { ChevronDown, ChevronUp, CircleUser, LogOut } from "lucide-react"
+import NotificationCenter from "./NotificationCenter"
+
+interface MaintenanceRequest {
+  _id: string;
+  title: string;
+  category: string;
+  location: string;
+  description: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  imageData?: string;
+  imageContentType?: string;
+  workerFeedback?: string;
+  rating?: number;
+}
 
 const Header = () => {
   const [studentData, setStudentData] = useState<{
@@ -13,6 +29,7 @@ const Header = () => {
     dormitory: string
   } | null>(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -77,6 +94,10 @@ const Header = () => {
                 <p className="text-sm font-medium text-gray-900">{studentData.regNumber}</p>
                 <p className="text-xs text-gray-500">{studentData.dormitory}</p>
               </div>
+
+                      <div className="relative mr-auto flex justify-start">
+                        <NotificationCenter requests={requests} />
+                      </div>
 
               <div className="py-1 border-t border-gray-100">
                 <button

@@ -104,7 +104,7 @@ const NotificationCenter = ({ requests }: NotificationCenterProps) => {
       {/* Notification Bell Button */}
       <button
         onClick={() => setShowNotifications(!showNotifications)}
-        className="relative p-3 rounded-full hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex gap-3 outline-none relative p-3 rounded-full hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
         aria-label="Notifications"
       >
         <Bell className="w-6 h-6 text-gray-600" />
